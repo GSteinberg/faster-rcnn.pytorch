@@ -23,7 +23,8 @@ import torch.optim as optim
 
 import torchvision.transforms as transforms
 import torchvision.datasets as dset
-from scipy.misc import imread
+import cv2
+# from scipy.misc import imread
 from roi_data_layer.roidb import combined_roidb
 from roi_data_layer.roibatchLoader import roibatchLoader
 from model.utils.config import cfg, cfg_from_file, cfg_from_list, get_output_dir
@@ -165,12 +166,13 @@ if __name__ == '__main__':
   load_name = os.path.join(input_dir,
     'faster_rcnn_{}_{}_{}.pth'.format(args.checksession, args.checkepoch, args.checkpoint))
 
-  pascal_classes = np.asarray(['__background__',
-                       'aeroplane', 'bicycle', 'bird', 'boat',
-                       'bottle', 'bus', 'car', 'cat', 'chair',
-                       'cow', 'diningtable', 'dog', 'horse',
-                       'motorbike', 'person', 'pottedplant',
-                       'sheep', 'sofa', 'train', 'tvmonitor'])
+  pascal_classes = np.asarray(['__background__', 'pfm-1', 'ksf casing'])
+  # pascal_classes = np.asarray(['__background__',
+  #                      'aeroplane', 'bicycle', 'bird', 'boat',
+  #                      'bottle', 'bus', 'car', 'cat', 'chair',
+  #                      'cow', 'diningtable', 'dog', 'horse',
+  #                      'motorbike', 'person', 'pottedplant',
+  #                      'sheep', 'sofa', 'train', 'tvmonitor'])
 
   # initilize the network here.
   if args.net == 'vgg16':
@@ -217,10 +219,16 @@ if __name__ == '__main__':
     gt_boxes = gt_boxes.cuda()
 
   # make variable
-  im_data = Variable(im_data, volatile=True)
-  im_info = Variable(im_info, volatile=True)
-  num_boxes = Variable(num_boxes, volatile=True)
-  gt_boxes = Variable(gt_boxes, volatile=True)
+  with torch.no_grad():
+    im_data = Variable(im_data)
+    im_info = Variable(im_info)
+    num_boxes = Variable(num_boxes)
+    gt_boxes = Variable(gt_boxes)
+
+  # im_data = Variable(im_data, volatile=True)
+  # im_info = Variable(im_info, volatile=True)
+  # num_boxes = Variable(num_boxes, volatile=True)
+  # gt_boxes = Variable(gt_boxes, volatile=True)
 
   if args.cuda > 0:
     cfg.CUDA = True
@@ -261,13 +269,13 @@ if __name__ == '__main__':
       # Load the demo image
       else:
         im_file = os.path.join(args.image_dir, imglist[num_images])
-        # im = cv2.imread(im_file)
-        im_in = np.array(imread(im_file))
-      if len(im_in.shape) == 2:
-        im_in = im_in[:,:,np.newaxis]
-        im_in = np.concatenate((im_in,im_in,im_in), axis=2)
+        im = cv2.imread(im_file)
+        # im_in = np.array(imread(im_file))
+      # if len(im_in.shape) == 2:
+      #   im_in = im_in[:,:,np.newaxis]
+      #   im_in = np.concatenate((im_in,im_in,im_in), axis=2)
       # rgb -> bgr
-      im = im_in[:,:,::-1]
+      # im = im_in[:,:,::-1]
 
       blobs, im_scales = _get_image_blob(im)
       assert len(im_scales) == 1, "Only single-image batch implemented"

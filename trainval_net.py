@@ -153,7 +153,8 @@ if __name__ == '__main__':
   print(args)
 
   if args.dataset == "pascal_voc":
-      args.imdb_name = "voc_2007_trainval"
+      # args.imdb_name = "voc_2007_trainval"
+      args.imdb_name = "voc_2007_train"
       args.imdbval_name = "voc_2007_test"
       args.set_cfgs = ['ANCHOR_SCALES', '[8, 16, 32]', 'ANCHOR_RATIOS', '[0.5,1,2]', 'MAX_NUM_GT_BOXES', '20']
   elif args.dataset == "pascal_voc_0712":
