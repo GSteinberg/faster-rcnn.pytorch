@@ -185,7 +185,6 @@ if __name__ == '__main__':
     fasterRCNN = resnet(pascal_classes, 152, pretrained=False, class_agnostic=args.class_agnostic)
   else:
     print("network is not defined")
-    pdb.set_trace()
 
   fasterRCNN.create_architecture()
 
@@ -198,11 +197,7 @@ if __name__ == '__main__':
   if 'pooling_mode' in checkpoint.keys():
     cfg.POOLING_MODE = checkpoint['pooling_mode']
 
-
   print('load model successfully!')
-
-  # pdb.set_trace()
-
   print("load checkpoint %s" % (load_name))
 
   # initilize the tensor holder here.
@@ -219,16 +214,16 @@ if __name__ == '__main__':
     gt_boxes = gt_boxes.cuda()
 
   # make variable
-  with torch.no_grad():
-    im_data = Variable(im_data)
-    im_info = Variable(im_info)
-    num_boxes = Variable(num_boxes)
-    gt_boxes = Variable(gt_boxes)
+  # with torch.no_grad():
+  #   im_data = Variable(im_data)
+  #   im_info = Variable(im_info)
+  #   num_boxes = Variable(num_boxes)
+  #   gt_boxes = Variable(gt_boxes)
 
-  # im_data = Variable(im_data, volatile=True)
-  # im_info = Variable(im_info, volatile=True)
-  # num_boxes = Variable(num_boxes, volatile=True)
-  # gt_boxes = Variable(gt_boxes, volatile=True)
+  im_data = Variable(im_data, volatile=True)
+  im_info = Variable(im_info, volatile=True)
+  num_boxes = Variable(num_boxes, volatile=True)
+  gt_boxes = Variable(gt_boxes, volatile=True)
 
   if args.cuda > 0:
     cfg.CUDA = True
@@ -292,7 +287,6 @@ if __name__ == '__main__':
               gt_boxes.resize_(1, 1, 5).zero_()
               num_boxes.resize_(1).zero_()
 
-      # pdb.set_trace()
       det_tic = time.time()
 
       rois, cls_prob, bbox_pred, \
@@ -334,8 +328,14 @@ if __name__ == '__main__':
 
       pred_boxes /= im_scales[0]
 
+      # pdb.set_trace();
+
       scores = scores.squeeze()
       pred_boxes = pred_boxes.squeeze()
+      
+      torch.set_printoptions(threshold=10000)
+      print(pred_boxes)
+
       det_toc = time.time()
       detect_time = det_toc - det_tic
       misc_tic = time.time()
