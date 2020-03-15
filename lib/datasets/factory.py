@@ -22,7 +22,7 @@ import numpy as np
 # for year in ['2007', '2012']:
 for year in ['2007']:
   # for split in ['train', 'val', 'trainval', 'test']:
-  for split in ['train', 'test']:
+  for split in ['trainval', 'test']:
     name = 'voc_{}_{}'.format(year, split)
     __sets[name] = (lambda split=split, year=year: pascal_voc(split, year))
 

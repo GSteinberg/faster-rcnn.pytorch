@@ -333,7 +333,7 @@ class vg(imdb):
                                        dets[k, 2] + 1, dets[k, 3] + 1))
 
 
-    def _do_python_eval(self, output_dir, pickle=True, eval_attributes = False):
+    def _do_python_eval(self, output_dir, use_pickle=True, eval_attributes = False):
         # We re-use parts of the pascal voc python code for visual genome
         aps = []
         nposs = []
@@ -366,7 +366,7 @@ class vg(imdb):
             aps += [ap]
             nposs += [float(npos)]
             print('AP for {} = {:.4f} (npos={:,})'.format(cls, ap, npos))
-            if pickle:
+            if use_pickle:
                 with open(os.path.join(output_dir, cls + '_pr.pkl'), 'wb') as f:
                     pickle.dump({'rec': rec, 'prec': prec, 'ap': ap,
                         'scores': scores, 'npos':npos}, f)

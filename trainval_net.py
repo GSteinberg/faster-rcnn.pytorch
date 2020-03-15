@@ -153,8 +153,8 @@ if __name__ == '__main__':
   print(args)
 
   if args.dataset == "pascal_voc":
-      # args.imdb_name = "voc_2007_trainval"
-      args.imdb_name = "voc_2007_train"
+      args.imdb_name = "voc_2007_trainval"
+      # args.imdb_name = "voc_2007_train"
       args.imdbval_name = "voc_2007_test"
       args.set_cfgs = ['ANCHOR_SCALES', '[8, 16, 32]', 'ANCHOR_RATIOS', '[0.5,1,2]', 'MAX_NUM_GT_BOXES', '20']
   elif args.dataset == "pascal_voc_0712":
@@ -195,6 +195,7 @@ if __name__ == '__main__':
   # -- Note: Use validation set and disable the flipped to enable faster loading.
   cfg.TRAIN.USE_FLIPPED = True
   cfg.USE_GPU_NMS = args.cuda
+
   imdb, roidb, ratio_list, ratio_index = combined_roidb(args.imdb_name)
   train_size = len(roidb)
 
