@@ -78,6 +78,10 @@ def parse_args():
   parser.add_argument('--cag', dest='class_agnostic',
                       help='whether perform class_agnostic bbox regression',
                       action='store_true')
+  parser.add_argument('--split', dest='train_test_split',
+                      help='choose percent of training data - default is 95 \
+                      train grass / 5 test rubble',
+                      default=-1, type=int)
 
 # config optimization
   parser.add_argument('--o', dest='optimizer',
