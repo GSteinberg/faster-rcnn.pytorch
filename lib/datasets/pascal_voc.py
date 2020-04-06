@@ -52,10 +52,10 @@ class pascal_voc(imdb):
         #                  'cow', 'diningtable', 'dog', 'horse',
         #                  'motorbike', 'person', 'pottedplant',
         #                  'sheep', 'sofa', 'train', 'tvmonitor')
-        self._classes = ('__background__', 'pfm-1', 'ksf casing')
+        self._classes = ('__background__', 'pfm-1', 'ksf-casing', 'ksf-cap')
         self._class_to_ind = dict(zip(self.classes, xrange(self.num_classes)))
-        # self._image_ext = '.jpg'
-        self._image_ext = '.png'
+        self._image_ext = '.jpg'
+        # self._image_ext = '.png'
         self._image_index = self._load_image_set_index()
         # Default to roidb handler
         # self._roidb_handler = self.selective_search_roidb
