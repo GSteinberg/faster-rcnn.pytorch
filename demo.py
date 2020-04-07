@@ -172,7 +172,7 @@ if __name__ == '__main__':
   #                      'cow', 'diningtable', 'dog', 'horse',
   #                      'motorbike', 'person', 'pottedplant',
   #                      'sheep', 'sofa', 'train', 'tvmonitor'])
-  pascal_classes = np.asarray(['__background__', 'pfm-1', 'ksf casing'])
+  pascal_classes = np.asarray(['__background__', 'pfm-1', 'ksf-casing'])
   # initilize the network here.
   if args.net == 'vgg16':
     fasterRCNN = vgg16(pascal_classes, pretrained=False, class_agnostic=args.class_agnostic)

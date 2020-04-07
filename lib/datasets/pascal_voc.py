@@ -52,7 +52,7 @@ class pascal_voc(imdb):
         #                  'cow', 'diningtable', 'dog', 'horse',
         #                  'motorbike', 'person', 'pottedplant',
         #                  'sheep', 'sofa', 'train', 'tvmonitor')
-        self._classes = ('__background__', 'pfm-1', 'ksf-casing', 'ksf-cap')
+        self._classes = ('__background__', 'pfm-1', 'ksf-casing')
         self._class_to_ind = dict(zip(self.classes, xrange(self.num_classes)))
         self._image_ext = '.jpg'
         # self._image_ext = '.png'
@@ -234,10 +234,10 @@ class pascal_voc(imdb):
         for ix, obj in enumerate(objs):
             bbox = obj.find('bndbox')
             # Make pixel indexes 0-based
-            x1 = float(bbox.find('xmin').text) - 1
-            y1 = float(bbox.find('ymin').text) - 1
-            x2 = float(bbox.find('xmax').text) - 1
-            y2 = float(bbox.find('ymax').text) - 1
+            x1 = float(bbox.find('xmin').text)# - 1
+            y1 = float(bbox.find('ymin').text)# - 1
+            x2 = float(bbox.find('xmax').text)# - 1
+            y2 = float(bbox.find('ymax').text)# - 1
 
             diffc = obj.find('difficult')
             difficult = 0 if diffc == None else int(diffc.text)
@@ -318,7 +318,7 @@ class pascal_voc(imdb):
                 use_07_metric=use_07_metric)
             print("recall: ", rec)
             print("precision: ", prec)
-            import pdb; pdb.set_trace()
+            # import pdb; pdb.set_trace()
             aps += [ap]
             print('AP for {} = {:.4f}'.format(cls, ap))
             with open(os.path.join(output_dir, cls + '_pr.pkl'), 'wb') as f:

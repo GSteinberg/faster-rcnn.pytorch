@@ -159,7 +159,7 @@ if __name__ == '__main__':
     fasterRCNN = resnet(imdb.classes, 152, pretrained=False, class_agnostic=args.class_agnostic)
   else:
     print("network is not defined")
-    pdb.set_trace()
+    # pdb.set_trace()
 
   fasterRCNN.create_architecture()
 
@@ -314,7 +314,7 @@ if __name__ == '__main__':
 
       if vis:
           cv2.imwrite('result.png', im2show)
-          pdb.set_trace()
+          # pdb.set_trace()
           #cv2.imshow('test', im2show)
           #cv2.waitKey(0)
 

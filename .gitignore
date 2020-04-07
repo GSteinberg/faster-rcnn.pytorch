@@ -90,6 +90,9 @@ docs/source/scripts/activation_images/
 
 ## General
 
+# Datasets - images
+images/*
+
 # Compiled Object files
 *.slo
 *.lo

@@ -156,6 +156,28 @@ if __name__ == '__main__':
   print('Called with args:')
   print(args)
 
+  # Split data into training and testing
+  train_data = []
+  test_data = []
+  ImageSetsDir = "data/VOCdevkit2007/VOC2007/ImageSets/"
+  images = open(ImageSetsDir + "Main/all.txt").readlines()
+  if args.train_test_split > 0:
+      np.random.shuffle(images)
+      pivot = int(len(images) * (args.train_test_split / 100))
+      train_data = images[:pivot]
+      test_data = images[pivot:]
+  else:
+      train_data = [i for i in images if "Mar16Grass" in i or "grass_orth" in i]
+      test_data = set(images) - set(train_data)
+
+  with open(ImageSetsDir + "Main/trainval.txt", "w") as train:
+      for item in train_data:
+          train.write(item)
+      
+  with open(ImageSetsDir + "Main/test.txt", "w") as test:
+      for item in test_data:
+          test.write(item)
+  
   if args.dataset == "pascal_voc":
       args.imdb_name = "voc_2007_trainval"
       # args.imdb_name = "voc_2007_train"
