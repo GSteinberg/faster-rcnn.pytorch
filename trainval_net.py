@@ -161,6 +161,7 @@ if __name__ == '__main__':
   test_data = []
   ImageSetsDir = "data/VOCdevkit2007/VOC2007/ImageSets/"
   images = open(ImageSetsDir + "Main/all.txt").readlines()
+  np.random.seed(101)
   if args.train_test_split > 0:
       np.random.shuffle(images)
       pivot = int(len(images) * (args.train_test_split / 100))
