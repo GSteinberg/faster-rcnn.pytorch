@@ -162,11 +162,14 @@ if __name__ == '__main__':
   ImageSetsDir = "data/VOCdevkit2007/VOC2007/ImageSets/"
   images = open(ImageSetsDir + "Main/all.txt").readlines()
   np.random.seed(101)
+    
+  # if a percentage is specified, split data by percentage
   if args.train_test_split > 0:
       np.random.shuffle(images)
       pivot = int(len(images) * (args.train_test_split / 100))
       train_data = images[:pivot]
       test_data = images[pivot:]
+  # if no percent is specified, split data by grass:train/rubble:test
   else:
       train_data = [i for i in images if "Mar16Grass" in i or "grass_orth" in i]
       test_data = set(images) - set(train_data)
