@@ -36,7 +36,6 @@ from model.utils.net_utils import save_net, load_net, vis_detections
 from model.utils.blob import im_list_to_blob
 from model.faster_rcnn.vgg16 import vgg16
 from model.faster_rcnn.resnet import resnet
-import pdb
 
 try:
     xrange          # Python 2
@@ -184,7 +183,6 @@ if __name__ == '__main__':
     fasterRCNN = resnet(pascal_classes, 152, pretrained=False, class_agnostic=args.class_agnostic)
   else:
     print("network is not defined")
-    pdb.set_trace()
 
   fasterRCNN.create_architecture()
 
@@ -199,8 +197,6 @@ if __name__ == '__main__':
 
 
   print('load model successfully!')
-
-  # pdb.set_trace()
 
   print("load checkpoint %s" % (load_name))
 
@@ -285,7 +281,6 @@ if __name__ == '__main__':
               gt_boxes.resize_(1, 1, 5).zero_()
               num_boxes.resize_(1).zero_()
 
-      # pdb.set_trace()
       det_tic = time.time()
 
       rois, cls_prob, bbox_pred, \
@@ -334,6 +329,7 @@ if __name__ == '__main__':
       misc_tic = time.time()
       if vis:
           im2show = np.copy(im)
+
       for j in xrange(1, len(pascal_classes)):
           inds = torch.nonzero(scores[:,j]>thresh).view(-1)
           # if there is det
@@ -351,6 +347,10 @@ if __name__ == '__main__':
             # keep = nms(cls_dets, cfg.TEST.NMS, force_cpu=not cfg.USE_GPU_NMS)
             keep = nms(cls_boxes[order, :], cls_scores[order], cfg.TEST.NMS)
             cls_dets = cls_dets[keep.view(-1).long()]
+            
+            # coordinates and accuracy for predicted boxes
+            print(cls_dets)
+
             if vis:
               im2show = vis_detections(im2show, pascal_classes[j], cls_dets.cpu().numpy(), 0.5)
 
