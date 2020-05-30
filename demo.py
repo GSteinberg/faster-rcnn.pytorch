@@ -96,6 +96,12 @@ def parse_args():
   parser.add_argument('--webcam_num', dest='webcam_num',
                       help='webcam ID number',
                       default=-1, type=int)
+  parser.add_argument('--crop_size', dest='cropped_img_size',
+                      help='size at which ImageSplitter splits orthos',
+                      default=-1, type=int)
+  parser.add_argument('--crop_stride', dest='cropped_img_stride',
+                      help='stride ImageSplitter uses to split orthos',
+                      default=-1, type=int)
 
   args = parser.parse_args()
   return args
@@ -348,14 +354,26 @@ if __name__ == '__main__':
             keep = nms(cls_boxes[order, :], cls_scores[order], cfg.TEST.NMS)
             cls_dets = cls_dets[keep.view(-1).long()]
             
-            # coordinates and accuracy for predicted boxes
+            ## coordinates and accuracy for predicted boxes #
+            
+            # row and col of image in respective orthophoto (img_ortho)
+            split_img_name = imglist[num_images].split("_Split")
+            img_row, img_col = int(split_img_name[1][:2]), \
+                               int(split_img_name[1][2:4])
+            img_ortho = split_img_name[0] + ".tif"
+            
+            # 2 elemt list of pixel of center of landmine
+            # [average(xmin, xmax), average(ymin, ymax)]
+            cropped_px = [ int((int(cls_dets[0][0]) + int(cls_dets[0][2])) / 2),
+                           int((int(cls_dets[0][1]) + int(cls_dets[0][3])) / 2) ]
+            
+            # converting to orthophoto scale
+            size_minus_stride = args.cropped_img_size - args.cropped_img_stride
+            ortho_px = [ cropped_px[0] + (img_col*size_minus_stride), \
+                         cropped_px[1] + (img_row*size_minus_stride) ]
+
             pdb.set_trace()
-            img_row = imglist[num_images][-8:-6]
-            img_col = imglist[num_images][-6:-4]
-            print("Image number: " + img_num)
-            print('xmin: {}\nymin: {}\nxmax: {}\nymax: {}', \
-                    int(cls_dets[0][1]), int(cls_dets[0][1]), \
-                    int(cls_dets[0][2]), int(cls_dets[0][3]))
+            ## ============================================ ##
 
             if vis:
               im2show = vis_detections(im2show, pascal_classes[j], cls_dets.cpu().numpy(), 0.5)
