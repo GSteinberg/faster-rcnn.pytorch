@@ -355,22 +355,42 @@ if __name__ == '__main__':
             cls_dets = cls_dets[keep.view(-1).long()]
             
             ## coordinates and accuracy for predicted boxes #
-            
+            coords = []
             # row and col of image in respective orthophoto (img_ortho)
             split_img_name = imglist[num_images].split("_Split")
             img_row, img_col = int(split_img_name[1][:2]), \
                                int(split_img_name[1][2:4])
-            img_ortho = split_img_name[0] + ".tif"
+            img_ortho = split_img_name[0]
             
             # 2 elemt list of pixel of center of landmine
-            # [average(xmin, xmax), average(ymin, ymax)]
+            # structure: [average(xmin, xmax), average(ymin, ymax)]
             cropped_px = [ int((int(cls_dets[0][0]) + int(cls_dets[0][2])) / 2),
                            int((int(cls_dets[0][1]) + int(cls_dets[0][3])) / 2) ]
             
             # converting to orthophoto scale
             size_minus_stride = args.cropped_img_size - args.cropped_img_stride
-            ortho_px = [ cropped_px[0] + (img_col*size_minus_stride), \
-                         cropped_px[1] + (img_row*size_minus_stride) ]
+            ortho_x, ortho_y = cropped_px[0] + (img_col*size_minus_stride), \
+                               cropped_px[1] + (img_row*size_minus_stride)
+
+            # fetch respective ortho metdata
+            # structure: metadata[0]    == x-pixel res
+            #            metadata[1:3]  == rotational components
+            #            metadata[3]    == y-pixel res
+            #            metadata[4]    == Easting of upper left pixel
+            #            metadata[5]    == Northing of upper left pixel
+            ortho_dir = os.path.join("../../OrthoData/Mar16Grass/images", \
+                    img_ortho + ".tfw")
+            f = open(ortho_dir, "r")
+            metadata = f.read().split("\n")[:-1]
+            f.close()
+
+            x_res, y_res, easting, northing = \
+                    float(metadata[0]), float(metadata[3]), \
+                    float(metadata[4]), float(metadata[5])
+
+            # x-pixel res
+            coords.append( (easting + (ortho_x*x_res), 
+                    northing + (ortho_y*y_res)) )
 
             pdb.set_trace()
             ## ============================================ ##
