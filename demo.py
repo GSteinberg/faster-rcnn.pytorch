@@ -349,7 +349,13 @@ if __name__ == '__main__':
             cls_dets = cls_dets[keep.view(-1).long()]
             
             # coordinates and accuracy for predicted boxes
-            print(cls_dets)
+            pdb.set_trace()
+            img_row = imglist[num_images][-8:-6]
+            img_col = imglist[num_images][-6:-4]
+            print("Image number: " + img_num)
+            print('xmin: {}\nymin: {}\nxmax: {}\nymax: {}', \
+                    int(cls_dets[0][1]), int(cls_dets[0][1]), \
+                    int(cls_dets[0][2]), int(cls_dets[0][3]))
 
             if vis:
               im2show = vis_detections(im2show, pascal_classes[j], cls_dets.cpu().numpy(), 0.5)
