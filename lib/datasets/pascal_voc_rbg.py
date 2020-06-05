@@ -34,14 +34,15 @@ class pascal_voc(imdb):
 
 
     self._data_path = os.path.join(self._devkit_path, 'VOC' + self._year)
-    self._classes = ('__background__',  # always index 0
-                     'aeroplane', 'bicycle', 'bird', 'boat',
-                     'bottle', 'bus', 'car', 'cat', 'chair',
-                     'cow', 'diningtable', 'dog', 'horse',
-                     'motorbike', 'person', 'pottedplant',
-                     'sheep', 'sofa', 'train', 'tvmonitor')
+    self._classes = ('__background__', 'pfm-1', 'ksf-casing', 'dummy')
+    # self._classes = ('__background__',  # always index 0
+    #                  'aeroplane', 'bicycle', 'bird', 'boat',
+    #                  'bottle', 'bus', 'car', 'cat', 'chair',
+    #                  'cow', 'diningtable', 'dog', 'horse',
+    #                  'motorbike', 'person', 'pottedplant',
+    #                  'sheep', 'sofa', 'train', 'tvmonitor')
     self._class_to_ind = dict(list(zip(self.classes, list(range(self.num_classes)))))
-    self._image_ext = '.jpg'
+    self._image_ext = '.tif'
     self._image_index = self._load_image_set_index()
     # Default to roidb handler
     self._roidb_handler = self.gt_roidb

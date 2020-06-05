@@ -52,7 +52,7 @@ class pascal_voc(imdb):
         #                  'cow', 'diningtable', 'dog', 'horse',
         #                  'motorbike', 'person', 'pottedplant',
         #                  'sheep', 'sofa', 'train', 'tvmonitor')
-        self._classes = ('__background__', 'pfm-1', 'ksf-casing')
+        self._classes = ('__background__', 'pfm-1', 'ksf-casing', 'dummy')
         self._class_to_ind = dict(zip(self.classes, xrange(self.num_classes)))
         self._image_ext = '.tif'
         # self._image_ext = '.png'
