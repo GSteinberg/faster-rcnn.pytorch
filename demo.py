@@ -8,8 +8,10 @@ from __future__ import division
 from __future__ import print_function
 
 import _init_paths
+import csv
 import os
 import sys
+import utm
 import numpy as np
 import argparse
 import pprint
@@ -249,6 +251,9 @@ if __name__ == '__main__':
     print('Loaded Photo: {} images.'.format(num_images))
 
 
+    ## coordinates and accuracy for predicted boxes #
+    coords = {}
+    photos = {}
     while (num_images >= 0):
         total_tic = time.time()
         if webcam_num == -1:
@@ -335,6 +340,8 @@ if __name__ == '__main__':
             im2show = np.copy(im)
 
         for j in xrange(1, len(pascal_classes)):
+            if pascal_classes[j] == "dummy": continue
+            
             inds = torch.nonzero(scores[:,j]>thresh).view(-1)
             # if there is det
             if inds.numel() > 0:
@@ -350,15 +357,12 @@ if __name__ == '__main__':
                 keep = nms(cls_boxes[order, :], cls_scores[order], cfg.TEST.NMS)
                 cls_dets = cls_dets[keep.view(-1).long()]
             
-                ## coordinates and accuracy for predicted boxes #
-                coords = []
                 # row and col of image in respective orthophoto (img_ortho)
                 split_img_name = imglist[num_images].split("_Split")
                 img_row, img_col = int(split_img_name[1][:2]), \
                                    int(split_img_name[1][2:4])
                 img_ortho = split_img_name[0]
             
-                pdb.set_trace()
                 # 2 elemt list of pixel of center of landmine
                 # structure: [average(xmin, xmax), average(ymin, ymax)]
                 cropped_px = [ int((int(cls_dets[0][0]) + int(cls_dets[0][2])) / 2),
@@ -375,7 +379,18 @@ if __name__ == '__main__':
                 #            metadata[3]    == y-pixel res
                 #            metadata[4]    == Easting of upper left pixel
                 #            metadata[5]    == Northing of upper left pixel
-                ortho_dir = os.path.join("../../OrthoData/Mar16Grass/images", \
+                img_to_dir = ""
+                if "Mar16" in img_ortho:
+                    img_to_dir = "Mar16Grass"
+                elif "Grass" in img_ortho:
+                    img_to_dir = "grassOrth"
+                elif "Test" in img_ortho:
+                    img_to_dir = "rubbOrth2"
+                elif "Rubble" in img_ortho:
+                    img_to_dir = "rubbOrth1"
+                elif "Sand" in img_ortho:
+                    img_to_dir = "May13Sand"
+                ortho_dir = os.path.join("../../OrthoData/" + img_to_dir + "/images", \
                             img_ortho + ".tfw")
                 f = open(ortho_dir, "r")
                 metadata = f.read().split("\n")[:-1]
@@ -385,13 +400,20 @@ if __name__ == '__main__':
                         float(metadata[0]), float(metadata[3]), \
                         float(metadata[4]), float(metadata[5])
 
-                coords.append( (easting + (ortho_x*x_res), 
-                        northing + (ortho_y*y_res)) )
+                # if img_ortho not in photos.keys():
+                #     photos[img_ortho] = {'pfm-1':0, 'ksf-casing':0}
+                # photos[img_ortho][pascal_classes[j]]+=1
+                
+                if img_ortho not in coords.keys():
+                    coords[img_ortho] = []
+                coords[img_ortho].append([pascal_classes[j], easting + (ortho_x*x_res), 
+                        northing + (ortho_y*y_res)])
                 ## ============================================ ##
 
                 if vis:
                     im2show = vis_detections(im2show, pascal_classes[j], \
                             cls_dets.cpu().numpy(), 0.5)
+
 
         misc_toc = time.time()
         nms_time = misc_toc - misc_tic
@@ -413,6 +435,36 @@ if __name__ == '__main__':
             print('Frame rate:', frame_rate)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
+
+    # convert utm to lat long
+    for img_name in coords.keys():
+        for pnt in range(len(coords[img_name])):
+            lat_long = utm.to_latlon(coords[img_name][pnt][1], \
+                    coords[img_name][pnt][2], 18, 'T')
+            coords[img_name][pnt].extend(lat_long)
+
+    # coords for each ortho
+    for img_name in coords.keys():
+        with open(img_name + '_coords.csv', 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(["Object", "Easting", "Northing", "Latitude", "Longitude"])
+            for c in coords[img_name]:
+                writer.writerow(c[:])
+        
+    # All coords from all orthos
+    with open('all_coords.csv', 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["Photo", "Object", "Easting", "Northing", "Latitude", "Longitude"])
+        for img_name in coords:
+            for c in coords[img_name]:
+                writer.writerow([img_name] + c[:])
+
+    # with open('object_metrics.csv', 'w', newline='') as csvfile2: 
+    #     writer = csv.writer(csvfile2)
+    #     writer.writerow(["Photo", "PFM-1s", "KSF-Casing"])
+    #     for p in photos.keys():
+    #         writer.writerow([p, photos[p]['pfm-1'], photos[p]['ksf-casing']])
+    
     if webcam_num >= 0:
         cap.release()
         cv2.destroyAllWindows()
