@@ -445,14 +445,14 @@ if __name__ == '__main__':
 
     # coords for each ortho
     for img_name in coords.keys():
-        with open(img_name + '_coords.csv', 'w', newline='') as csvfile:
+        with open("output/csvs/" + img_name + '_coords.csv', 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
             writer.writerow(["Object", "Easting", "Northing", "Latitude", "Longitude"])
             for c in coords[img_name]:
                 writer.writerow(c[:])
         
     # All coords from all orthos
-    with open('all_coords.csv', 'w', newline='') as csvfile:
+    with open('output/csvs/all_coords.csv', 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(["Photo", "Object", "Easting", "Northing", "Latitude", "Longitude"])
         for img_name in coords:
