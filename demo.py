@@ -251,9 +251,7 @@ if __name__ == '__main__':
     print('Loaded Photo: {} images.'.format(num_images))
 
 
-    ## coordinates and accuracy for predicted boxes #
-    coords = {}
-    photos = {}
+    coords = {}     # coordiantes for predicted boxes
     while (num_images >= 0):
         total_tic = time.time()
         if webcam_num == -1:
@@ -400,10 +398,6 @@ if __name__ == '__main__':
                         float(metadata[0]), float(metadata[3]), \
                         float(metadata[4]), float(metadata[5])
 
-                # if img_ortho not in photos.keys():
-                #     photos[img_ortho] = {'pfm-1':0, 'ksf-casing':0}
-                # photos[img_ortho][pascal_classes[j]]+=1
-                
                 if img_ortho not in coords.keys():
                     coords[img_ortho] = []
                 coords[img_ortho].append([pascal_classes[j], easting + (ortho_x*x_res), 
@@ -459,12 +453,6 @@ if __name__ == '__main__':
             for c in coords[img_name]:
                 writer.writerow([img_name] + c[:])
 
-    # with open('object_metrics.csv', 'w', newline='') as csvfile2: 
-    #     writer = csv.writer(csvfile2)
-    #     writer.writerow(["Photo", "PFM-1s", "KSF-Casing"])
-    #     for p in photos.keys():
-    #         writer.writerow([p, photos[p]['pfm-1'], photos[p]['ksf-casing']])
-    
     if webcam_num >= 0:
         cap.release()
         cv2.destroyAllWindows()
