@@ -11,6 +11,7 @@ import _init_paths
 import os
 import sys
 import numpy as np
+import math
 import argparse
 import pprint
 import pdb
@@ -344,6 +345,13 @@ if __name__ == '__main__':
               if box[4] > 0.5:
                   center_pred[c].append(
                           (np.average([box[0], box[2]]), np.average([box[1], box[3]])) )
+      
+      # TP: pred px close to ground truth px
+      for c in xrange(1, imdb.num_classes):
+          for tru in center_truth[c]:
+              for prd in center_pred[c]:
+                  dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(tru,prd)]))
+                  if dist < 3: conf_matrix[c]['tp'] += 1
       pdb.set_trace()
 
       # for each class
