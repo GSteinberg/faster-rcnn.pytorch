@@ -158,7 +158,6 @@ if __name__ == '__main__':
     fasterRCNN = resnet(imdb.classes, 152, pretrained=False, class_agnostic=args.class_agnostic)
   else:
     print("network is not defined")
-    # pdb.set_trace()
 
   fasterRCNN.create_architecture()
 
@@ -224,6 +223,9 @@ if __name__ == '__main__':
 
   fasterRCNN.eval()
   empty_array = np.transpose(np.array([[],[],[],[],[]]), (1,0))
+  
+  conf_matrix = [{"tp": 0, "fp": 0, "tn": 0, "fn": 0} for _ in xrange(imdb.num_classes)]
+  # for each image
   for i in range(num_images):
 
       data = next(data_iter)
@@ -272,6 +274,8 @@ if __name__ == '__main__':
       if vis:
           im = cv2.imread(imdb.image_path_at(i))
           im2show = np.copy(im)
+      
+      # for each class in each image
       for j in xrange(1, imdb.num_classes):
           inds = torch.nonzero(scores[:,j]>thresh).view(-1)
           # if there is det
@@ -284,7 +288,6 @@ if __name__ == '__main__':
               cls_boxes = pred_boxes[inds][:, j * 4:(j + 1) * 4]
             
             cls_dets = torch.cat((cls_boxes, cls_scores.unsqueeze(1)), 1)
-            # cls_dets = torch.cat((cls_boxes, cls_scores), 1)
             cls_dets = cls_dets[order]
             keep = nms(cls_boxes[order, :], cls_scores[order], cfg.TEST.NMS)
             cls_dets = cls_dets[keep.view(-1).long()]
@@ -293,6 +296,7 @@ if __name__ == '__main__':
             all_boxes[j][i] = cls_dets.cpu().numpy()
           else:
             all_boxes[j][i] = empty_array
+        
 
       # Limit to max_per_image detections *over all classes*
       if max_per_image > 0:
@@ -313,9 +317,46 @@ if __name__ == '__main__':
 
       if vis:
           cv2.imwrite('result.png', im2show)
-          # pdb.set_trace()
-          #cv2.imshow('test', im2show)
-          #cv2.waitKey(0)
+
+      # calculate precision, recall and F1 for each class
+      # imdb.classes = ('__background__', 'pfm-1', 'ksf-casing', 'dummy')
+      #
+      # roidb[i]['image']       - image file path
+      # roidb[i]['boxes']       - all bounding boxes
+      #                             array([[331, 1, 412, 104], 
+      #                                    [48, 585, 86, 644]], dtype=uint16)
+      # roidb[i]['gt_classes']  - class index for each bounding box
+      #                             array([2, 1], dtype=int32)
+      # all_boxes[1][i]         - all predicted boxes for pfm-1
+      
+      center_truth = [[] for _ in xrange(imdb.num_classes)]
+      box_idx = 0
+      # get center pxl for each ground truth box
+      for box in roidb[i]['boxes']:
+          center_truth[roidb[i]['gt_classes'][box_idx]].append( 
+                  (np.average([box[0], box[2]]), np.average([box[1], box[3]])) )
+          box_idx+=1
+
+      # center pxl for each pred box
+      center_pred = [[] for _ in xrange(imdb.num_classes)]
+      for c in xrange(1, imdb.num_classes):
+          for box in all_boxes[c][i]:
+              if box[4] > 0.5:
+                  center_pred[c].append(
+                          (np.average([box[0], box[2]]), np.average([box[1], box[3]])) )
+      pdb.set_trace()
+
+      # for each class
+      # for c in xrange(1, imdb.num_classes):
+      #     for (x,y) in center_pxs[c]:
+      #         for pred in all_boxes[c][i]:
+      #             # TP: predicted box encloses ground truth px
+      #             if pred[4] > 0.5 and \
+      #                     pred[0] < x < pred[2] and pred[1] < y < pred[3]:
+      #                 conf_matrix[c]['tp'] += 1
+      #             # FP: predicted box lands outside
+      #             elif
+
 
   with open(det_file, 'wb') as f:
       pickle.dump(all_boxes, f, pickle.HIGHEST_PROTOCOL)
