@@ -346,12 +346,21 @@ if __name__ == '__main__':
                   center_pred[c].append(
                           (np.average([box[0], box[2]]), np.average([box[1], box[3]])) )
       
-      # TP: pred px close to ground truth px
       for c in xrange(1, imdb.num_classes):
-          for tru in center_truth[c]:
-              for prd in center_pred[c]:
-                  dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(tru,prd)]))
-                  if dist < 3: conf_matrix[c]['tp'] += 1
+          for prd in center_pred[c]:
+              match = False
+              for tru in center_truth[c]:
+                  dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(prd,tru)]))
+                  # TP: pred px matches ground truth px only once
+                  if dist < 3 and not match: 
+                      conf_matrix[c]['tp'] += 1
+                      match = True
+                  # FP: duplicate pred boxes
+                  elif dist < 3 and match:
+                      conf_matrix[c]['fp'] += 1
+              # FP: no truth box to match pred box
+              if not match: conf_matrix[c]['fp'] += 1
+      
       pdb.set_trace()
 
       # for each class
