@@ -15,6 +15,7 @@ import math
 import argparse
 import pprint
 import pdb
+import json
 import time
 
 import cv2
@@ -345,8 +346,9 @@ if __name__ == '__main__':
               if box[4] > 0.5:
                   center_pred[c].append(
                           (np.average([box[0], box[2]]), np.average([box[1], box[3]])) )
-      
+     
       for c in xrange(1, imdb.num_classes):
+          truths_matched = 0
           for prd in center_pred[c]:
               match = False
               for tru in center_truth[c]:
@@ -354,26 +356,22 @@ if __name__ == '__main__':
                   # TP: pred px matches ground truth px only once
                   if dist < 3 and not match: 
                       conf_matrix[c]['tp'] += 1
+                      truths_matched += 1
                       match = True
                   # FP: duplicate pred boxes
                   elif dist < 3 and match:
                       conf_matrix[c]['fp'] += 1
+              
               # FP: no truth box to match pred box
               if not match: conf_matrix[c]['fp'] += 1
-      
-      pdb.set_trace()
+          
+          # FN: if there are leftover truths unmatched
+          if truths_matched != len(center_truth[c]):
+              conf_matrix[c]['fn'] += 1
 
-      # for each class
-      # for c in xrange(1, imdb.num_classes):
-      #     for (x,y) in center_pxs[c]:
-      #         for pred in all_boxes[c][i]:
-      #             # TP: predicted box encloses ground truth px
-      #             if pred[4] > 0.5 and \
-      #                     pred[0] < x < pred[2] and pred[1] < y < pred[3]:
-      #                 conf_matrix[c]['tp'] += 1
-      #             # FP: predicted box lands outside
-      #             elif
-
+  with open("conf_matrix.txt","w") as f:
+      for el in conf_matrix:
+          f.write(json.dumps(el))
 
   with open(det_file, 'wb') as f:
       pickle.dump(all_boxes, f, pickle.HIGHEST_PROTOCOL)
