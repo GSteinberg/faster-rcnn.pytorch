@@ -7,6 +7,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import csv
 import _init_paths
 import os
 import sys
@@ -42,54 +43,54 @@ except NameError:
 
 
 def parse_args():
-  """
-  Parse input arguments
-  """
-  parser = argparse.ArgumentParser(description='Train a Fast R-CNN network')
-  parser.add_argument('--dataset', dest='dataset',
-                      help='training dataset',
-                      default='pascal_voc', type=str)
-  parser.add_argument('--cfg', dest='cfg_file',
-                      help='optional config file',
-                      default='cfgs/vgg16.yml', type=str)
-  parser.add_argument('--net', dest='net',
-                      help='vgg16, res50, res101, res152',
-                      default='res101', type=str)
-  parser.add_argument('--set', dest='set_cfgs',
-                      help='set config keys', default=None,
-                      nargs=argparse.REMAINDER)
-  parser.add_argument('--load_dir', dest='load_dir',
-                      help='directory to load models', default="models",
-                      type=str)
-  parser.add_argument('--cuda', dest='cuda',
-                      help='whether use CUDA',
-                      action='store_true')
-  parser.add_argument('--ls', dest='large_scale',
-                      help='whether use large imag scale',
-                      action='store_true')
-  parser.add_argument('--mGPUs', dest='mGPUs',
-                      help='whether use multiple GPUs',
-                      action='store_true')
-  parser.add_argument('--cag', dest='class_agnostic',
-                      help='whether perform class_agnostic bbox regression',
-                      action='store_true')
-  parser.add_argument('--parallel_type', dest='parallel_type',
-                      help='which part of model to parallel, 0: all, 1: model before roi pooling',
-                      default=0, type=int)
-  parser.add_argument('--checksession', dest='checksession',
-                      help='checksession to load model',
-                      default=1, type=int)
-  parser.add_argument('--checkepoch', dest='checkepoch',
-                      help='checkepoch to load network',
-                      default=1, type=int)
-  parser.add_argument('--checkpoint', dest='checkpoint',
-                      help='checkpoint to load network',
-                      default=10021, type=int)
-  parser.add_argument('--vis', dest='vis',
-                      help='visualization mode',
-                      action='store_true')
-  args = parser.parse_args()
-  return args
+    """
+    Parse input arguments
+    """
+    parser = argparse.ArgumentParser(description='Train a Fast R-CNN network')
+    parser.add_argument('--dataset', dest='dataset',
+                        help='training dataset',
+                        default='pascal_voc', type=str)
+    parser.add_argument('--cfg', dest='cfg_file',
+                        help='optional config file',
+                        default='cfgs/vgg16.yml', type=str)
+    parser.add_argument('--net', dest='net',
+                        help='vgg16, res50, res101, res152',
+                        default='res101', type=str)
+    parser.add_argument('--set', dest='set_cfgs',
+                        help='set config keys', default=None,
+                        nargs=argparse.REMAINDER)
+    parser.add_argument('--load_dir', dest='load_dir',
+                        help='directory to load models', default="models",
+                        type=str)
+    parser.add_argument('--cuda', dest='cuda',
+                        help='whether use CUDA',
+                        action='store_true')
+    parser.add_argument('--ls', dest='large_scale',
+                        help='whether use large imag scale',
+                        action='store_true')
+    parser.add_argument('--mGPUs', dest='mGPUs',
+                        help='whether use multiple GPUs',
+                        action='store_true')
+    parser.add_argument('--cag', dest='class_agnostic',
+                        help='whether perform class_agnostic bbox regression',
+                        action='store_true')
+    parser.add_argument('--parallel_type', dest='parallel_type',
+                        help='which part of model to parallel, 0: all, 1: model before roi pooling',
+                        default=0, type=int)
+    parser.add_argument('--checksession', dest='checksession',
+                        help='checksession to load model',
+                        default=1, type=int)
+    parser.add_argument('--checkepoch', dest='checkepoch',
+                        help='checkepoch to load network',
+                        default=1, type=int)
+    parser.add_argument('--checkpoint', dest='checkpoint',
+                        help='checkpoint to load network',
+                        default=10021, type=int)
+    parser.add_argument('--vis', dest='vis',
+                        help='visualization mode',
+                        action='store_true')
+    args = parser.parse_args()
+    return args
 
 lr = cfg.TRAIN.LEARNING_RATE
 momentum = cfg.TRAIN.MOMENTUM
@@ -226,7 +227,7 @@ if __name__ == '__main__':
   fasterRCNN.eval()
   empty_array = np.transpose(np.array([[],[],[],[],[]]), (1,0))
   
-  conf_matrix = [{"tp": 0, "fp": 0, "tn": 0, "fn": 0} for _ in xrange(imdb.num_classes)]
+  conf_matrix = [{"tp":0, "fp":0, "tn":0, "fn":0} for _ in xrange(imdb.num_classes+1)]
   # for each image
   for i in range(num_images):
 
@@ -354,24 +355,56 @@ if __name__ == '__main__':
               for tru in center_truth[c]:
                   dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(prd,tru)]))
                   # TP: pred px matches ground truth px only once
-                  if dist < 3 and not match: 
+                  if dist < 4 and not match: 
                       conf_matrix[c]['tp'] += 1
                       truths_matched += 1
                       match = True
                   # FP: duplicate pred boxes
-                  elif dist < 3 and match:
+                  elif dist < 4 and match:
                       conf_matrix[c]['fp'] += 1
+                      # print("FP dupe: " + roidb[i]['image'] + " " + str(c))
               
               # FP: no truth box to match pred box
-              if not match: conf_matrix[c]['fp'] += 1
+              if not match: 
+                  conf_matrix[c]['fp'] += 1
+                  # print("FP: " + roidb[i]['image'] + " " + str(c))
           
           # FN: if there are leftover truths unmatched
-          if truths_matched != len(center_truth[c]):
-              conf_matrix[c]['fn'] += 1
+          if truths_matched < len(center_truth[c]):
+              # print("FN: " + roidb[i]['image'] + " " + str(c))
+              conf_matrix[c]['fn'] += len(center_truth[c])-truths_matched
 
-  with open("conf_matrix.txt","w") as f:
-      for el in conf_matrix:
-          f.write(json.dumps(el))
+  # total fp, tp, fn
+  for metric in ['tp', 'fp', 'tn']:
+      conf_matrix[-1][metric] = sum(conf_matrix[c][metric] \
+              for c in xrange(1,imdb.num_classes) if imdb.classes[c] != "dummy")
+  
+  
+  # calculate precision, recall, F1 for each class and all classes
+  prec_rec_f1 = [{'prec':0, 'recall':0, 'f1':0} for _ in xrange(imdb.num_classes+1)]
+  for c in xrange(1,len(conf_matrix)):
+      # precision - tp/(tp+fp)
+      prec_rec_f1[c]['prec'] = conf_matrix[c]['tp'] / \
+              (conf_matrix[c]['tp'] + conf_matrix[c]['fp'])
+      # recall - tp/(tp+fn)
+      prec_rec_f1[c]['recall'] = conf_matrix[c]['tp'] / \
+              (conf_matrix[c]['tp'] + conf_matrix[c]['fn'])
+      # f1
+      prec_rec_f1[c]['f1'] = 2 * \
+              ((prec_rec_f1[c]['prec'] * prec_rec_f1[c]['recall']) / \
+               (prec_rec_f1[c]['prec'] + prec_rec_f1[c]['recall']))
+
+
+  with open("output/csvs/conf_matrix.csv","w", newline='') as f:
+      writer = csv.writer(f)
+      writer.writerow(["-----", "PFM-1", "KSF-Casing", "Total"])
+      writer.writerow(["TP",conf_matrix[1]['tp'],conf_matrix[2]['tp'],conf_matrix[4]['tp']])
+      writer.writerow(["FP",conf_matrix[1]['fp'],conf_matrix[2]['fp'],conf_matrix[4]['fp']])
+      writer.writerow(["FN",conf_matrix[1]['fn'],conf_matrix[2]['fn'],conf_matrix[4]['fn']])
+      writer.writerow(["Prec",prec_rec_f1[1]['prec'],prec_rec_f1[2]['prec'],prec_rec_f1[4]['prec']])
+      writer.writerow(["Recall",prec_rec_f1[1]['recall'],prec_rec_f1[2]['recall'],prec_rec_f1[4]['recall']])
+      writer.writerow(["F1",prec_rec_f1[1]['f1'],prec_rec_f1[2]['f1'],prec_rec_f1[4]['f1']])
+          
 
   with open(det_file, 'wb') as f:
       pickle.dump(all_boxes, f, pickle.HIGHEST_PROTOCOL)

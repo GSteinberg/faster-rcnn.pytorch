@@ -171,8 +171,8 @@ if __name__ == '__main__':
       test_data = images[pivot:]
   # if no percent is specified, split data by grass:train/rubble:test
   else:
-      train_data = [i for i in images if "Grass" in i]
-      test_data = set(images) - set(train_data)
+      test_data = [i for i in images if "Sand" in i]
+      train_data = set(images) - set(test_data)
 
   with open(ImageSetsDir + "Main/trainval.txt", "w") as train:
       for item in train_data:
