@@ -408,6 +408,11 @@ if __name__ == '__main__':
                  (prec_rec_f1[imdb.classes[c]]['prec'] + prec_rec_f1[imdb.classes[c]]['rec']))
 
     prec_rec_f1['total'] = {'prec':0, 'rec':0, 'f1':0}
+    for ob in prec_rec_f1.keys():
+        if ob == "__background__" or ob == "dummy": continue
+        for q in 
+        prec_rec_f1['total']['prec'] = 
+
     prec_rec_f1['total']['prec'] = np.average([ \
             prec_rec_f1[ob]['prec'] for ob in prec_rec_f1.keys() if ob != "__background__"])
     prec_rec_f1['total']['rec'] = np.average([ \
@@ -428,7 +433,7 @@ if __name__ == '__main__':
         writer.writerow(["Prec", prec_rec_f1['pfm-1']['prec'], \
                 prec_rec_f1['ksf-casing']['prec'], prec_rec_f1['total']['prec']])
         writer.writerow(["Recall", prec_rec_f1['pfm-1']['rec'], \
-                prec_rec_f1['ksf-casing']['rec'],prec_rec_f1['total']['prec']])
+                prec_rec_f1['ksf-casing']['rec'],prec_rec_f1['total']['rec']])
         writer.writerow(["F1", prec_rec_f1['pfm-1']['f1'], \
                 prec_rec_f1['ksf-casing']['f1'],prec_rec_f1['total']['f1']])
             
