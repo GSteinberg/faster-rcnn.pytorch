@@ -227,7 +227,7 @@ if __name__ == '__main__':
     fasterRCNN.eval()
     empty_array = np.transpose(np.array([[],[],[],[],[]]), (1,0))
     
-    conf_matrix = [{"tp":0, "fp":0, "tn":0, "fn":0} for _ in xrange(imdb.num_classes)]
+    raw_error = [{"tp":0, "fp":0, "tn":0, "fn":0} for _ in range(imdb.num_classes)]
     # for each image
     for i in range(num_images):
 
@@ -328,7 +328,7 @@ if __name__ == '__main__':
         # all_boxes[1][i]         - all predicted boxes for first class
         
         # get center pxl for each ground truth box
-        center_truth = [[] for _ in xrange(imdb.num_classes)]
+        center_truth = [[] for _ in range(imdb.num_classes)]
         box_idx = 0
         for box in roidb[i]['boxes']:
             center_truth[roidb[i]['gt_classes'][box_idx]].append( 
@@ -336,8 +336,8 @@ if __name__ == '__main__':
             box_idx+=1
 
         # center pxl for each pred box
-        center_pred = [[] for _ in xrange(imdb.num_classes)]
-        for c in xrange(1, imdb.num_classes):
+        center_pred = [[] for _ in range(imdb.num_classes)]
+        for c in range(1,imdb.num_classes):
             for box in all_boxes[c][i]:
                 # if score for that box > 0.5
                 if box[4] >= 0.5:
@@ -346,10 +346,7 @@ if __name__ == '__main__':
 
         # for each class except background
         min_dist = 8.5
-        for c in xrange(1, imdb.num_classes):
-            # if any(x in roidb[i]['image'] for x in ["0205", "0304", "0306", "0307"]):
-            #     pdb.set_trace()
-
+        for c in range(1, imdb.num_classes):
             if imdb.classes[c] == "dummy": continue
 
             # for predicted box of class c
@@ -361,81 +358,55 @@ if __name__ == '__main__':
                     dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(prd,tru)]))
                     # TP: pred px matches ground truth px only once
                     if dist < min_dist and not match: 
-                        conf_matrix[c]['tp'] += 1
+                        raw_error[c]['tp'] += 1
                         uniq_preds+=1
                         match = True
                     # FP: duplicate pred boxes
                     elif dist < min_dist and match:
-                        conf_matrix[c]['fp'] += 1
-                        # print('FP dup: {} {}'.format(roidb[i]['image'], c))
+                        raw_error[c]['fp'] += 1
                 
                 # FP: no truth box to match pred box
                 if not match: 
-                    conf_matrix[c]['fp'] += 1
-                    # print('FP: {} {}'.format(roidb[i]['image'], c))
+                    raw_error[c]['fp'] += 1
             
             # FN: if total # ground truths < accurately predicted boxes
             if uniq_preds < len(center_truth[c]):
-                conf_matrix[c]['fn'] += len(center_truth[c]) - uniq_preds
-                # print('FN: {} {}'.format(roidb[i]['image'], c))
-
-        # if center_truth[1] or center_truth[2]:
-        #     print(center_truth)
-        #     print(center_pred)
-        #     print(conf_matrix)
-
+                raw_error[c]['fn'] += len(center_truth[c]) - uniq_preds
 
     # total fp, tp, fn
-    totals = {'tp':0, 'fp':0, 'tn':0, 'fn':0}
-    for metric in ['tp', 'fp', 'fn']:
-        totals[metric] = sum(conf_matrix[c][metric] \
-                for c in xrange(1,imdb.num_classes) if imdb.classes[c] != "dummy")
-    
+    raw_total = {'tp':0, 'fp':0, 'tn':0, 'fn':0}
+    for key in raw_total.keys():
+        raw_total[key] = sum(raw_error[c][key] for c in range(1,imdb.num_classes))
+
     # calculate precision, recall, F1 for each class and all classes
-    prec_rec_f1 = {x:{} for x in imdb.classes if x != "dummy"}
-    for c in xrange(1,imdb.num_classes):
+    rel_error = [{"prec":0, "recall":0, "f1":0} for _ in range(imdb.num_classes)]
+    for c in range(1,imdb.num_classes):
         if imdb.classes[c] == "dummy": continue
 
         # precision - tp/(tp+fp)
-        prec_rec_f1[imdb.classes[c]]['prec'] = conf_matrix[c]['tp'] / \
-                (conf_matrix[c]['tp'] + conf_matrix[c]['fp'])
+        rel_error[c]['prec'] = raw_error[c]['tp'] / (raw_error[c]['tp']+raw_error[c]['fp'])
         # recall - tp/(tp+fn)
-        prec_rec_f1[imdb.classes[c]]['rec'] = conf_matrix[c]['tp'] / \
-                (conf_matrix[c]['tp'] + conf_matrix[c]['fn'])
-        # f1
-        prec_rec_f1[imdb.classes[c]]['f1'] = 2 * \
-                ((prec_rec_f1[imdb.classes[c]]['prec'] * prec_rec_f1[imdb.classes[c]]['rec']) / \
-                 (prec_rec_f1[imdb.classes[c]]['prec'] + prec_rec_f1[imdb.classes[c]]['rec']))
+        rel_error[c]['recall'] = raw_error[c]['tp'] / (raw_error[c]['tp']+raw_error[c]['fn'])
+        # f1 - 2*[(prec*rec)/(prec+rec)]
+        rel_error[c]['f1'] = 2 * \
+                ((rel_error[c]['prec'] * rel_error[c]['recall']) / \
+                 (rel_error[c]['prec'] + rel_error[c]['recall']))
 
-    prec_rec_f1['total'] = {'prec':0, 'rec':0, 'f1':0}
-    for ob in prec_rec_f1.keys():
-        if ob == "__background__" or ob == "dummy": continue
-        for q in 
-        prec_rec_f1['total']['prec'] = 
+    # average prec, recall, f1
+    rel_total = {"prec":0, "recall":0, "f1":0}
+    for key in rel_total.keys():
+        rel_total[key] = np.average(
+            [rel_error[c][key] for c in range(1,imdb.num_classes) if imdb.classes[c] != "dummy"])
 
-    prec_rec_f1['total']['prec'] = np.average([ \
-            prec_rec_f1[ob]['prec'] for ob in prec_rec_f1.keys() if ob != "__background__"])
-    prec_rec_f1['total']['rec'] = np.average([ \
-            prec_rec_f1[ob]['rec'] for ob in prec_rec_f1.keys() if ob != "__background__"])
-    prec_rec_f1['total']['f1'] = np.average([ \
-            prec_rec_f1[ob]['f1'] for ob in prec_rec_f1.keys() if ob != "__background__"])
-
-
-    with open("output/csvs/conf_matrix.csv","w", newline='') as f:
+    with open("output/csvs/error_report.csv","w", newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(["-----", "PFM-1", "KSF-Casing", "Total"])
-        writer.writerow(["TP", conf_matrix[1]['tp'], conf_matrix[2]['tp'], \
-                totals['tp']])
-        writer.writerow(["FP", conf_matrix[1]['fp'], conf_matrix[2]['fp'], \
-                totals['fp']])
-        writer.writerow(["FN", conf_matrix[1]['fn'], conf_matrix[2]['fn'], \
-                totals['fn']])
-        writer.writerow(["Prec", prec_rec_f1['pfm-1']['prec'], \
-                prec_rec_f1['ksf-casing']['prec'], prec_rec_f1['total']['prec']])
-        writer.writerow(["Recall", prec_rec_f1['pfm-1']['rec'], \
-                prec_rec_f1['ksf-casing']['rec'],prec_rec_f1['total']['rec']])
-        writer.writerow(["F1", prec_rec_f1['pfm-1']['f1'], \
-                prec_rec_f1['ksf-casing']['f1'],prec_rec_f1['total']['f1']])
+
+        writer.writerow(["----"] + imdb.classes[1:] + ["total"])
+        for key in raw_total.keys():
+            writer.writerow([key] + [raw_error[i][key] for i in range(1,len(raw_error))] + [raw_total[key]])
+        writer.writerow(['----'])
+        for key in rel_total.keys():
+            writer.writerow([key] + [rel_error[i][key] for i in range(1,len(rel_error))] + [rel_total[key]])
             
 
     with open(det_file, 'wb') as f:
