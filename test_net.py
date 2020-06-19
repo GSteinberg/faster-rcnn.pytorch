@@ -92,12 +92,11 @@ def parse_args():
     args = parser.parse_args()
     return args
 
-lr = cfg.TRAIN.LEARNING_RATE
-momentum = cfg.TRAIN.MOMENTUM
-weight_decay = cfg.TRAIN.WEIGHT_DECAY
-
-if __name__ == '__main__':
-
+def test(start_idx):
+    lr = cfg.TRAIN.LEARNING_RATE
+    momentum = cfg.TRAIN.MOMENTUM
+    weight_decay = cfg.TRAIN.WEIGHT_DECAY
+    
     args = parse_args()
 
     print('Called with args:')
@@ -228,9 +227,11 @@ if __name__ == '__main__':
     empty_array = np.transpose(np.array([[],[],[],[],[]]), (1,0))
     
     raw_error = [{"tp":0, "fp":0, "tn":0, "fn":0} for _ in range(imdb.num_classes)]
+    i = start_idx
     # for each image
-    for i in range(num_images):
+    while i < num_images:
 
+        # make a for loop here to catch up
         data = next(data_iter)
         with torch.no_grad():
             im_data.resize_(data[0].size()).copy_(data[0])
@@ -238,11 +239,19 @@ if __name__ == '__main__':
             gt_boxes.resize_(data[2].size()).copy_(data[2])
             num_boxes.resize_(data[3].size()).copy_(data[3])
 
-        det_tic = time.time()
-        rois, cls_prob, bbox_pred, \
-        rpn_loss_cls, rpn_loss_box, \
-        RCNN_loss_cls, RCNN_loss_bbox, \
-        rois_label = fasterRCNN(im_data, im_info, gt_boxes, num_boxes)
+        try:
+            det_tic = time.time()
+            rois, cls_prob, bbox_pred, \
+            rpn_loss_cls, rpn_loss_box, \
+            RCNN_loss_cls, RCNN_loss_bbox, \
+            rois_label = fasterRCNN(im_data, im_info, gt_boxes, num_boxes)
+        except RuntimeError as err:
+            # return first index untested
+            if "CUDA out of memory" in err.args[0]:
+                break
+            else:
+                print(arr.args[0])
+                exit()
 
         scores = cls_prob.data
         boxes = rois.data[:, :, 1:5]
@@ -299,8 +308,7 @@ if __name__ == '__main__':
                 all_boxes[j][i] = cls_dets.cpu().numpy()
             else:
                 all_boxes[j][i] = empty_array
-          
-
+         
         # Limit to max_per_image detections *over all classes*
         if max_per_image > 0:
             image_scores = np.hstack([all_boxes[j][i][:, -1]
@@ -372,16 +380,19 @@ if __name__ == '__main__':
             # FN: if total # ground truths < accurately predicted boxes
             if uniq_preds < len(center_truth[c]):
                 raw_error[c]['fn'] += len(center_truth[c]) - uniq_preds
+        i+=1
 
     # total fp, tp, fn
     raw_total = {'tp':0, 'fp':0, 'tn':0, 'fn':0}
     for key in raw_total.keys():
         raw_total[key] = sum(raw_error[c][key] for c in range(1,imdb.num_classes))
 
+    raw_error.append(raw_total)
+    
     # calculate precision, recall, F1 for each class and all classes
     rel_error = [{"prec":0, "recall":0, "f1":0} for _ in range(imdb.num_classes)]
     for c in range(1,imdb.num_classes):
-        if imdb.classes[c] == "dummy": continue
+        if imdb.classes[c] == "dummy" or raw_error[c]['tp'] == 0: continue
 
         # precision - tp/(tp+fp)
         rel_error[c]['prec'] = raw_error[c]['tp'] / (raw_error[c]['tp']+raw_error[c]['fp'])
@@ -398,22 +409,50 @@ if __name__ == '__main__':
         rel_total[key] = np.average(
             [rel_error[c][key] for c in range(1,imdb.num_classes) if imdb.classes[c] != "dummy"])
 
-    with open("output/csvs/error_report.csv","w", newline='') as f:
-        writer = csv.writer(f)
+    rel_error.append(rel_total)
 
-        writer.writerow(["----"] + imdb.classes[1:] + ["total"])
-        for key in raw_total.keys():
-            writer.writerow([key] + [raw_error[i][key] for i in range(1,len(raw_error))] + [raw_total[key]])
-        writer.writerow(['----'])
-        for key in rel_total.keys():
-            writer.writerow([key] + [rel_error[i][key] for i in range(1,len(rel_error))] + [rel_total[key]])
-            
+    # with open(det_file, 'wb') as f:
+    #     pickle.dump(all_boxes, f, pickle.HIGHEST_PROTOCOL)
 
-    with open(det_file, 'wb') as f:
-        pickle.dump(all_boxes, f, pickle.HIGHEST_PROTOCOL)
-
-    print('Evaluating detections')
-    imdb.evaluate_detections(all_boxes, output_dir)
+    # print('Evaluating detections')
+    # imdb.evaluate_detections(all_boxes, output_dir)
 
     end = time.time()
     print("test time: %0.4fs" % (end - start))
+
+    # end of testing
+    return i, imdb.classes, raw_error, rel_error
+
+if __name__ == '__main__':
+    start_idx = 1
+    raw_error = []
+    rel_error = []
+    while start_idx >= 0:
+        pdb.set_trace()
+        start_idx, classes, raw_error_part, rel_error_part = test(start_idx-1)
+        
+        # first overflow
+        if not raw_error and not rel_error:
+            raw_error[:] = raw_error_part[:]
+            rel_error[:] = rel_error_part[:]
+        # not first overflow
+        else:
+            for c in range(len(raw_error_part)):
+                for key in raw_error_part[c].keys():
+                    raw_error[c][key] += raw_error_part[c][key]
+                
+                for key in rel_error_part[c]:
+                    rel_error[c][key] = np.average(
+                            rel_error[c][key], rel_error_part[c][key])
+
+    with open("output/csvs/error_report.csv","w", newline='') as f:
+        writer = csv.writer(f)
+
+        writer.writerow(["----"] + list(classes[1:]) + ["total"])
+        for key in raw_error[0].keys():
+            writer.writerow([key] + 
+                    [raw_error[i][key] for i in range(1,len(raw_error))])
+        writer.writerow(['----'])
+        for key in rel_error[0].keys():
+            writer.writerow([key] + 
+                    [rel_error[i][key] for i in range(1,len(rel_error))])
