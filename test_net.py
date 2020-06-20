@@ -344,11 +344,12 @@ def test():
             box_idx+=1
 
         # center pxl for each pred box
+        pred_thresh = 0.4
         center_pred = [[] for _ in range(imdb.num_classes)]
         for c in range(1,imdb.num_classes):
             for box in all_boxes[c][i]:
-                # if score for that box > 0.5
-                if box[4] >= 0.5:
+                # if score for that box > prediction threshold
+                if box[4] >= pred_thresh:
                     center_pred[c].append(
                             (np.average([box[0], box[2]]), np.average([box[1], box[3]])) )
 
@@ -419,7 +420,6 @@ if __name__ == '__main__':
             for i in range(start_idx, len(all_lines)):
                 f.write(all_lines[i] + "\n")
         
-        pdb.set_trace()
         crash_idx, classes, raw_error_part = test()
         torch.cuda.empty_cache()
 
