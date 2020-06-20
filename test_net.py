@@ -388,11 +388,59 @@ def test():
         raw_total[key] = sum(raw_error[c][key] for c in range(1,imdb.num_classes))
 
     raw_error.append(raw_total)
+
+    # with open(det_file, 'wb') as f:
+    #     pickle.dump(all_boxes, f, pickle.HIGHEST_PROTOCOL)
+
+    # print('Evaluating detections')
+    # imdb.evaluate_detections(all_boxes, output_dir)
+
+    end = time.time()
+    print("test time: %0.4fs" % (end - start))
+
+    # end of testing
+    if i == num_images: 
+        i = -1
+    return i, imdb.classes, raw_error
+
+if __name__ == '__main__':
+    # create a backup of test.txt
+    test_pth = os.path.join('data','VOCdevkit2007','VOC2007','ImageSets','Main','test.txt')
+    test_full_pth = os.path.join('data','VOCdevkit2007','VOC2007','ImageSets','Main','test_full.txt')
+    copyfile(test_pth, test_full_pth)
+
+    start_idx = 0
+    raw_error = []
+    while start_idx >= 0:
+        # Edit test.txt to start at start_idx
+        with open(test_pth, "w") as f, open(test_full_pth, "r") as f_full:
+            # exclude final whitespace
+            all_lines = f_full.read().split('\n')[:-1]
+            for i in range(start_idx, len(all_lines)):
+                f.write(all_lines[i] + "\n")
+        
+        pdb.set_trace()
+        crash_idx, classes, raw_error_part = test()
+        torch.cuda.empty_cache()
+
+        if crash_idx == -1:
+            start_idx = -1
+        else:
+            start_idx += crash_idx
+
+        # first overflow
+        if not raw_error:
+            raw_error[:] = raw_error_part[:]
+        # not first overflow
+        else:
+            for c in range(len(raw_error_part)):
+                for key in raw_error_part[c].keys():
+                    raw_error[c][key] += raw_error_part[c][key]
     
     # calculate precision, recall, F1 for each class and all classes
-    rel_error = [{"prec":0, "recall":0, "f1":0} for _ in range(imdb.num_classes)]
-    for c in range(1,imdb.num_classes):
-        if imdb.classes[c] == "dummy" or raw_error[c]['tp'] == 0: continue
+    rel_error = [{"prec":0, "recall":0, "f1":0} for _ in range(len(classes))]
+    for c in range(1, len(classes)):
+        if classes[c] == "dummy" or raw_error[c]['tp'] == 0: continue
 
         # precision - tp/(tp+fp)
         rel_error[c]['prec'] = raw_error[c]['tp'] / (raw_error[c]['tp']+raw_error[c]['fp'])
@@ -407,63 +455,9 @@ def test():
     rel_total = {"prec":0, "recall":0, "f1":0}
     for key in rel_total.keys():
         rel_total[key] = np.average(
-            [rel_error[c][key] for c in range(1,imdb.num_classes) if imdb.classes[c] != "dummy"])
+            [rel_error[c][key] for c in range(1, len(classes)) if classes[c] != "dummy"])
 
     rel_error.append(rel_total)
-
-    # with open(det_file, 'wb') as f:
-    #     pickle.dump(all_boxes, f, pickle.HIGHEST_PROTOCOL)
-
-    # print('Evaluating detections')
-    # imdb.evaluate_detections(all_boxes, output_dir)
-
-    end = time.time()
-    print("test time: %0.4fs" % (end - start))
-
-    # end of testing
-    if i == num_images: 
-        i = -1
-    return i, imdb.classes, raw_error, rel_error
-
-if __name__ == '__main__':
-    # create a backup of test.txt
-    test_pth = os.path.join('data','VOCdevkit2007','VOC2007','ImageSets','Main','test.txt')
-    test_full_pth = os.path.join('data','VOCdevkit2007','VOC2007','ImageSets','Main','test_full.txt')
-    copyfile(test_pth, test_full_pth)
-
-    start_idx = 0
-    raw_error = []
-    rel_error = []
-    while start_idx >= 0:
-        # Edit test.txt to start at start_idx
-        with open(test_pth, "w") as f, open(test_full_pth, "r") as f_full:
-            # exclude final whitespace
-            all_lines = f_full.read().split('\n')[:-1]
-            for i in range(start_idx, len(all_lines)):
-                f.write(all_lines[i] + "\n")
-        
-        # pdb.set_trace()
-        crash_idx, classes, raw_error_part, rel_error_part = test()
-        torch.cuda.empty_cache()
-
-        if crash_idx == -1:
-            start_idx = -1
-        else:
-            start_idx += crash_idx
-
-        # first overflow
-        if not raw_error and not rel_error:
-            raw_error[:] = raw_error_part[:]
-            rel_error[:] = rel_error_part[:]
-        # not first overflow
-        else:
-            for c in range(len(raw_error_part)):
-                for key in raw_error_part[c].keys():
-                    raw_error[c][key] += raw_error_part[c][key]
-                
-                for key in rel_error_part[c]:
-                    rel_error[c][key] = np.average(
-                            [rel_error[c][key], rel_error_part[c][key]])
 
     with open("output/csvs/error_report.csv","w", newline='') as f:
         writer = csv.writer(f)
