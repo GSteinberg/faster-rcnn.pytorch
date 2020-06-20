@@ -26,6 +26,7 @@ from torch.autograd import Variable
 import torch.nn as nn
 import torch.optim as optim
 import pickle
+from shutil import copyfile
 from roi_data_layer.roidb import combined_roidb
 from roi_data_layer.roibatchLoader import roibatchLoader
 from model.utils.config import cfg, cfg_from_file, cfg_from_list, get_output_dir
@@ -92,7 +93,7 @@ def parse_args():
     args = parser.parse_args()
     return args
 
-def test(start_idx):
+def test():
     lr = cfg.TRAIN.LEARNING_RATE
     momentum = cfg.TRAIN.MOMENTUM
     weight_decay = cfg.TRAIN.WEIGHT_DECAY
@@ -227,11 +228,10 @@ def test(start_idx):
     empty_array = np.transpose(np.array([[],[],[],[],[]]), (1,0))
     
     raw_error = [{"tp":0, "fp":0, "tn":0, "fn":0} for _ in range(imdb.num_classes)]
-    i = start_idx
+    i = 0
     # for each image
     while i < num_images:
 
-        # make a for loop here to catch up
         data = next(data_iter)
         with torch.no_grad():
             im_data.resize_(data[0].size()).copy_(data[0])
@@ -421,16 +421,36 @@ def test(start_idx):
     print("test time: %0.4fs" % (end - start))
 
     # end of testing
+    if i == num_images: 
+        i = -1
     return i, imdb.classes, raw_error, rel_error
 
 if __name__ == '__main__':
-    start_idx = 1
+    # create a backup of test.txt
+    test_pth = os.path.join('data','VOCdevkit2007','VOC2007','ImageSets','Main','test.txt')
+    test_full_pth = os.path.join('data','VOCdevkit2007','VOC2007','ImageSets','Main','test_full.txt')
+    copyfile(test_pth, test_full_pth)
+
+    start_idx = 0
     raw_error = []
     rel_error = []
     while start_idx >= 0:
-        pdb.set_trace()
-        start_idx, classes, raw_error_part, rel_error_part = test(start_idx-1)
+        # Edit test.txt to start at start_idx
+        with open(test_pth, "w") as f, open(test_full_pth, "r") as f_full:
+            # exclude final whitespace
+            all_lines = f_full.read().split('\n')[:-1]
+            for i in range(start_idx, len(all_lines)):
+                f.write(all_lines[i] + "\n")
         
+        # pdb.set_trace()
+        crash_idx, classes, raw_error_part, rel_error_part = test()
+        torch.cuda.empty_cache()
+
+        if crash_idx == -1:
+            start_idx = -1
+        else:
+            start_idx += crash_idx
+
         # first overflow
         if not raw_error and not rel_error:
             raw_error[:] = raw_error_part[:]
@@ -443,7 +463,7 @@ if __name__ == '__main__':
                 
                 for key in rel_error_part[c]:
                     rel_error[c][key] = np.average(
-                            rel_error[c][key], rel_error_part[c][key])
+                            [rel_error[c][key], rel_error_part[c][key]])
 
     with open("output/csvs/error_report.csv","w", newline='') as f:
         writer = csv.writer(f)
