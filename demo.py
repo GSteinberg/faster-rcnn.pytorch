@@ -151,6 +151,8 @@ if __name__ == '__main__':
     print('Called with args:')
     print(args)
 
+    args.cfg_file = "cfgs/{}.yml".format(args.net)
+
     if args.cfg_file is not None:
         cfg_from_file(args.cfg_file)
     if args.set_cfgs is not None:
@@ -249,7 +251,6 @@ if __name__ == '__main__':
         num_images = len(imglist)
 
     print('Loaded Photo: {} images.'.format(num_images))
-
 
     coords = {}     # coordiantes for predicted boxes
     while (num_images >= 0):
@@ -355,58 +356,71 @@ if __name__ == '__main__':
                 keep = nms(cls_boxes[order, :], cls_scores[order], cfg.TEST.NMS)
                 cls_dets = cls_dets[keep.view(-1).long()]
             
-                # row and col of image in respective orthophoto (img_ortho)
-                split_img_name = imglist[num_images].split("_Split")
-                img_row, img_col = int(split_img_name[1][:2]), \
-                                   int(split_img_name[1][2:4])
-                img_ortho = split_img_name[0]
-            
-                # 2 elemt list of pixel of center of landmine
-                # structure: [average(xmin, xmax), average(ymin, ymax)]
-                cropped_px = [ int((int(cls_dets[0][0]) + int(cls_dets[0][2])) / 2),
-                               int((int(cls_dets[0][1]) + int(cls_dets[0][3])) / 2) ]
-            
-                # converting to orthophoto scale
-                size_minus_stride = args.cropped_img_size - args.cropped_img_stride
-                ortho_x, ortho_y = cropped_px[0] + (img_col*size_minus_stride), \
-                                   cropped_px[1] + (img_row*size_minus_stride)
+                if cls_dets[0][4] >= 0.4:
 
-                # fetch respective ortho metdata
-                # structure: metadata[0]    == x-pixel res
-                #            metadata[1:3]  == rotational components
-                #            metadata[3]    == y-pixel res
-                #            metadata[4]    == Easting of upper left pixel
-                #            metadata[5]    == Northing of upper left pixel
-                img_to_dir = ""
-                if "Mar16" in img_ortho:
-                    img_to_dir = "Mar16Grass"
-                elif "Grass" in img_ortho:
-                    img_to_dir = "grassOrth"
-                elif "Test" in img_ortho:
-                    img_to_dir = "rubbOrth2"
-                elif "Rubble" in img_ortho:
-                    img_to_dir = "rubbOrth1"
-                elif "Sand" in img_ortho:
-                    img_to_dir = "May13Sand"
-                ortho_dir = os.path.join("../../OrthoData/" + img_to_dir + "/images", \
-                            img_ortho + ".tfw")
-                f = open(ortho_dir, "r")
-                metadata = f.read().split("\n")[:-1]
-                f.close()
+                    # row and col of image in respective orthophoto (img_ortho)
+                    split_img_name = imglist[num_images].split("_Split")
+                    img_row, img_col = int(split_img_name[1][:2]), \
+                                       int(split_img_name[1][2:4])
+                    img_ortho = split_img_name[0]
+                
+                    # 2 elemt list of pixel of center of landmine
+                    # structure: [average(xmin, xmax), average(ymin, ymax)]
 
-                x_res, y_res, easting, northing = \
-                        float(metadata[0]), float(metadata[3]), \
-                        float(metadata[4]), float(metadata[5])
+                    # print()
+                    # print('image: {}'.format(img_ortho))
+                    # print('class: {}'.format(pascal_classes[j]))
+                    # print('xmin: {}'.format(cls_dets[0][0]))
+                    # print('xmax: {}'.format(cls_dets[0][2]))
+                    # print('ymin: {}'.format(cls_dets[0][1]))
+                    # print('ymax: {}'.format(cls_dets[0][3]))
+                    # print('score: {}'.format(cls_dets[0][4]))
+                    # print()
 
-                if img_ortho not in coords.keys():
-                    coords[img_ortho] = []
-                coords[img_ortho].append([pascal_classes[j], easting + (ortho_x*x_res), 
-                        northing + (ortho_y*y_res)])
-                ## ============================================ ##
+                    cropped_px = [ int((int(cls_dets[0][0]) + int(cls_dets[0][2])) / 2),
+                                   int((int(cls_dets[0][1]) + int(cls_dets[0][3])) / 2) ]
 
-                if vis:
-                    im2show = vis_detections(im2show, pascal_classes[j], \
-                            cls_dets.cpu().numpy(), 0.5)
+                    # converting to orthophoto scale
+                    size_minus_stride = args.cropped_img_size - args.cropped_img_stride
+                    ortho_x, ortho_y = cropped_px[0] + (img_col*size_minus_stride), \
+                                       cropped_px[1] + (img_row*size_minus_stride)
+
+                    # fetch respective ortho metdata
+                    # structure: metadata[0]    == x-pixel res
+                    #            metadata[1:3]  == rotational components
+                    #            metadata[3]    == y-pixel res
+                    #            metadata[4]    == Easting of upper left pixel
+                    #            metadata[5]    == Northing of upper left pixel
+                    img_to_dir = ""
+                    if "Mar16" in img_ortho:
+                        img_to_dir = "Mar16Grass"
+                    elif "Grass" in img_ortho:
+                        img_to_dir = "grassOrth"
+                    elif "Test" in img_ortho:
+                        img_to_dir = "rubbOrth2"
+                    elif "Rubble" in img_ortho:
+                        img_to_dir = "rubbOrth1"
+                    elif "Sand" in img_ortho:
+                        img_to_dir = "May13Sand"
+                    ortho_dir = os.path.join("../../OrthoData/" + img_to_dir + "/images", \
+                                img_ortho + ".tfw")
+                    f = open(ortho_dir, "r")
+                    metadata = f.read().split("\n")[:-1]
+                    f.close()
+
+                    x_res, y_res, easting, northing = \
+                            float(metadata[0]), float(metadata[3]), \
+                            float(metadata[4]), float(metadata[5])
+
+                    if img_ortho not in coords.keys():
+                        coords[img_ortho] = []
+                    coords[img_ortho].append([pascal_classes[j], easting + (ortho_x*x_res), 
+                            northing + (ortho_y*y_res)])
+                    ## ============================================ ##
+
+                    if vis:
+                        im2show = vis_detections(im2show, pascal_classes[j], \
+                                cls_dets.cpu().numpy(), 0.5)
 
 
         misc_toc = time.time()
