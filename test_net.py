@@ -350,6 +350,16 @@ def test():
             for box in all_boxes[c][i]:
                 # if score for that box > prediction threshold
                 if box[4] >= pred_thresh:
+                    # print()
+                    # print('image: {}'.format(roidb[i]['image']))
+                    # print('class: {}'.format(imdb.classes[c]))
+                    # print('xmin: {}'.format(box[0]))
+                    # print('xmax: {}'.format(box[2]))
+                    # print('ymin: {}'.format(box[1]))
+                    # print('ymax: {}'.format(box[3]))
+                    # print('score: {}'.format(box[4]))
+                    # print()
+
                     center_pred[c].append(
                             (np.average([box[0], box[2]]), np.average([box[1], box[3]])) )
 
@@ -419,7 +429,7 @@ if __name__ == '__main__':
             all_lines = f_full.read().split('\n')[:-1]
             for i in range(start_idx, len(all_lines)):
                 f.write(all_lines[i] + "\n")
-        
+
         crash_idx, classes, raw_error_part = test()
         torch.cuda.empty_cache()
 
