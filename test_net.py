@@ -540,3 +540,26 @@ if __name__ == '__main__':
         for key in rel_error[0].keys():
             writer.writerow([key] + 
                     [rel_error[i][key] for i in range(1,len(rel_error))])
+
+    # convert utm to lat long
+    for img_name in coords.keys():
+        for pnt in range(len(coords[img_name])):
+            lat_long = utm.to_latlon(coords[img_name][pnt][1], \
+                    coords[img_name][pnt][2], 18, 'T')
+            coords[img_name][pnt].extend(lat_long)
+
+    # coords for each ortho
+    for img_name in coords.keys():
+        with open("output/csvs/" + img_name + '_coords.csv', 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(["Object", "Easting", "Northing", "Latitude", "Longitude"])
+            for c in coords[img_name]:
+                writer.writerow(c[:])
+        
+    # All coords from all orthos
+    with open('output/csvs/all_coords.csv', 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["Photo", "Object", "Easting", "Northing", "Latitude", "Longitude"])
+        for img_name in coords:
+            for c in coords[img_name]:
+                writer.writerow([img_name] + c[:])
