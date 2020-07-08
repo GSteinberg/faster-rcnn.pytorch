@@ -378,34 +378,44 @@ def test():
         for c in range(1, imdb.num_classes):
             if imdb.classes[c] == "dummy": continue
 
-            # row and col of image in respective orthophoto (img_ortho)
-            # to calculate position and coordinates in ortho scale
-            split_img_name = imglist[num_images].split("_Split")
-            img_row, img_col = int(split_img_name[1][:2]), \
-                               int(split_img_name[1][2:4])
-            img_ortho = split_img_name[0]
-
-            ## ============================================ ##
-
             # for predicted box of class c
             uniq_preds = 0
             for prd in center_pred[c]:
-                match = False
-                # for ground truth box of class c
-                for tru in center_truth[c]:
-                    dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(prd,tru)]))
-                    # TP: pred px matches ground truth px only once
-                    if dist < min_dist and not match: 
-                        raw_error[c]['tp'] += 1
-                        uniq_preds+=1
-                        match = True
-                    # FP: duplicate pred boxes
-                    elif dist < min_dist and match:
+                # pure inference
+                if args.inf:
+                    # row and col of image in respective orthophoto (img_ortho)
+                    # to calculate position and coordinates in ortho scale
+                    split_img_name = roidb[i]['image'].split("_Split")
+                    img_row, img_col = int(split_img_name[1][:2]), \
+                                       int(split_img_name[1][2:4])
+                    img_ortho = split_img_name[0].split("/")[-1]
+
+                    # converting to orthophoto scale
+                    size_minus_stride = args.cropped_img_size - args.cropped_img_stride
+                    ortho_x, ortho_y = prd[0] + (img_col*size_minus_stride), \
+                                       prd[1] + (img_row*size_minus_stride)
+
+
+                    pdb.set_trace()
+
+                # validation
+                else:
+                    match = False
+                    # for ground truth box of class c
+                    for tru in center_truth[c]:
+                        dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(prd,tru)]))
+                        # TP: pred px matches ground truth px only once
+                        if dist < min_dist and not match: 
+                            raw_error[c]['tp'] += 1
+                            uniq_preds+=1
+                            match = True
+                        # FP: duplicate pred boxes
+                        elif dist < min_dist and match:
+                            raw_error[c]['fp'] += 1
+                    
+                    # FP: no truth box to match pred box
+                    if not match: 
                         raw_error[c]['fp'] += 1
-                
-                # FP: no truth box to match pred box
-                if not match: 
-                    raw_error[c]['fp'] += 1
             
             # FN: if total # ground truths < accurately predicted boxes
             if uniq_preds < len(center_truth[c]):
