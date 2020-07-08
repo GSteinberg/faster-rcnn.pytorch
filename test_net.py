@@ -8,6 +8,7 @@ from __future__ import division
 from __future__ import print_function
 
 import csv
+import copy
 import _init_paths
 import os
 import sys
@@ -421,7 +422,7 @@ def test():
                 if img_ortho not in coords.keys():
                     coords[img_ortho] = []
 
-                coords[img_ortho].append([pascal_classes[j], easting + (ortho_x*x_res), 
+                coords[img_ortho].append([imdb.classes[c], easting + (ortho_x*x_res), 
                         northing + (ortho_y*y_res)])
                 # validation
                 # else:
@@ -498,12 +499,13 @@ if __name__ == '__main__':
 
         # first overflow
         if not coords:
-            raw_error[:] = raw_error_part[:]
+            coords = copy.deepcopy(coords_part)
         # not first overflow
         else:
-            for c in range(len(raw_error_part)):
-                for key in raw_error_part[c].keys():
-                    raw_error[c][key] += raw_error_part[c][key]
+            for orth in coords_part.keys():
+                if orth in coords.keys(): coords[orth].extend(coords_part[orth])
+                else: coords[orth] = coords_part[orth]
+        pdb.set_trace()
     
     # calculate precision, recall, F1 for each class and all classes
     rel_error = [{"prec":0, "recall":0, "f1":0} for _ in range(len(classes))]
