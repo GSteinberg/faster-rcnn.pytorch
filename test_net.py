@@ -90,6 +90,15 @@ def parse_args():
     parser.add_argument('--vis', dest='vis',
                         help='visualization mode',
                         action='store_true')
+    parser.add_argument('--inference', dest='inf',
+                        help='pure inference mode',
+                        action='store_true')
+    parser.add_argument('--crop_size', dest='cropped_img_size',
+                      help='size at which ImageSplitter splits orthos',
+                      default=-1, type=int)
+    parser.add_argument('--crop_stride', dest='cropped_img_stride',
+                      help='stride ImageSplitter uses to split orthos',
+                      default=-1, type=int)
     args = parser.parse_args()
     return args
 
@@ -139,6 +148,7 @@ def test():
     pprint.pprint(cfg)
 
     cfg.TRAIN.USE_FLIPPED = False
+    # image and annotations loading
     imdb, roidb, ratio_list, ratio_index = combined_roidb(args.imdbval_name, False)
     imdb.competition_mode(on=True)
 
@@ -368,6 +378,15 @@ def test():
         for c in range(1, imdb.num_classes):
             if imdb.classes[c] == "dummy": continue
 
+            # row and col of image in respective orthophoto (img_ortho)
+            # to calculate position and coordinates in ortho scale
+            split_img_name = imglist[num_images].split("_Split")
+            img_row, img_col = int(split_img_name[1][:2]), \
+                               int(split_img_name[1][2:4])
+            img_ortho = split_img_name[0]
+
+            ## ============================================ ##
+
             # for predicted box of class c
             uniq_preds = 0
             for prd in center_pred[c]:
@@ -399,12 +418,6 @@ def test():
         raw_total[key] = sum(raw_error[c][key] for c in range(1,imdb.num_classes))
 
     raw_error.append(raw_total)
-
-    # with open(det_file, 'wb') as f:
-    #     pickle.dump(all_boxes, f, pickle.HIGHEST_PROTOCOL)
-
-    # print('Evaluating detections')
-    # imdb.evaluate_detections(all_boxes, output_dir)
 
     end = time.time()
     print("test time: %0.4fs" % (end - start))
