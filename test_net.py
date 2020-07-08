@@ -239,6 +239,7 @@ def test():
     
     raw_error = [{"tp":0, "fp":0, "tn":0, "fn":0} for _ in range(imdb.num_classes)]
     i = 0
+    coords = {}     # coordiantes for predicted boxes
     # for each image
     while i < num_images:
 
@@ -382,40 +383,64 @@ def test():
             uniq_preds = 0
             for prd in center_pred[c]:
                 # pure inference
-                if args.inf:
-                    # row and col of image in respective orthophoto (img_ortho)
-                    # to calculate position and coordinates in ortho scale
-                    split_img_name = roidb[i]['image'].split("_Split")
-                    img_row, img_col = int(split_img_name[1][:2]), \
-                                       int(split_img_name[1][2:4])
-                    img_ortho = split_img_name[0].split("/")[-1]
+                # if args.inf:
+                # row and col of image in respective orthophoto (img_ortho)
+                # to calculate position and coordinates in ortho scale
+                split_img_name = roidb[i]['image'].split("_Split")
+                img_row, img_col = int(split_img_name[1][:2]), \
+                                   int(split_img_name[1][2:4])
+                img_ortho = split_img_name[0].split("/")[-1]
 
-                    # converting to orthophoto scale
-                    size_minus_stride = args.cropped_img_size - args.cropped_img_stride
-                    ortho_x, ortho_y = prd[0] + (img_col*size_minus_stride), \
-                                       prd[1] + (img_row*size_minus_stride)
+                # converting to orthophoto scale
+                size_minus_stride = args.cropped_img_size - args.cropped_img_stride
+                ortho_x, ortho_y = prd[0] + (img_col*size_minus_stride), \
+                                   prd[1] + (img_row*size_minus_stride)
 
+                # fetch respective ortho metadata
+                img_to_dir = ""
+                if "Mar16" in img_ortho:
+                    img_to_dir = "Mar16Grass"
+                elif "Grass" in img_ortho:
+                    img_to_dir = "grassOrth"
+                elif "Test" in img_ortho:
+                    img_to_dir = "rubbOrth2"
+                elif "Rubble" in img_ortho:
+                    img_to_dir = "rubbOrth1"
+                elif "Sand" in img_ortho:
+                    img_to_dir = "May13Sand"
+                ortho_dir = os.path.join("../../OrthoData/" + img_to_dir + "/images",
+                            img_ortho + ".tfw")
+                f = open(ortho_dir, "r")
+                metadata = f.read().split("\n")[:-1]
+                f.close()
 
-                    pdb.set_trace()
+                x_res, y_res, easting, northing = \
+                        float(metadata[0]), float(metadata[3]), \
+                        float(metadata[4]), float(metadata[5])
 
+                if img_ortho not in coords.keys():
+                    coords[img_ortho] = []
+
+                coords[img_ortho].append([pascal_classes[j], easting + (ortho_x*x_res), 
+                        northing + (ortho_y*y_res)])
                 # validation
-                else:
-                    match = False
-                    # for ground truth box of class c
-                    for tru in center_truth[c]:
-                        dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(prd,tru)]))
-                        # TP: pred px matches ground truth px only once
-                        if dist < min_dist and not match: 
-                            raw_error[c]['tp'] += 1
-                            uniq_preds+=1
-                            match = True
-                        # FP: duplicate pred boxes
-                        elif dist < min_dist and match:
-                            raw_error[c]['fp'] += 1
-                    
-                    # FP: no truth box to match pred box
-                    if not match: 
+                # else:
+                match = False
+                # for ground truth box of class c
+                for tru in center_truth[c]:
+                    dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(prd,tru)]))
+                    # TP: pred px matches ground truth px only once
+                    if dist < min_dist and not match: 
+                        raw_error[c]['tp'] += 1
+                        uniq_preds+=1
+                        match = True
+                    # FP: duplicate pred boxes
+                    elif dist < min_dist and match:
                         raw_error[c]['fp'] += 1
+                
+                # FP: no truth box to match pred box
+                if not match: 
+                    raw_error[c]['fp'] += 1
             
             # FN: if total # ground truths < accurately predicted boxes
             if uniq_preds < len(center_truth[c]):
@@ -435,7 +460,7 @@ def test():
     # end of testing
     if i == num_images: 
         i = -1
-    return i, imdb.classes, raw_error
+    return i, imdb.classes, raw_error, coords
 
 if __name__ == '__main__':
     # create a backup of test.txt
@@ -445,6 +470,7 @@ if __name__ == '__main__':
 
     start_idx = 0
     raw_error = []
+    coords = {}
     while start_idx >= 0:
         # Edit test.txt to start at start_idx
         with open(test_pth, "w") as f, open(test_full_pth, "r") as f_full:
@@ -453,7 +479,7 @@ if __name__ == '__main__':
             for i in range(start_idx, len(all_lines)):
                 f.write(all_lines[i] + "\n")
 
-        crash_idx, classes, raw_error_part = test()
+        crash_idx, classes, raw_error_part, coords_part = test()
         torch.cuda.empty_cache()
 
         if crash_idx == -1:
@@ -463,6 +489,15 @@ if __name__ == '__main__':
 
         # first overflow
         if not raw_error:
+            raw_error[:] = raw_error_part[:]
+        # not first overflow
+        else:
+            for c in range(len(raw_error_part)):
+                for key in raw_error_part[c].keys():
+                    raw_error[c][key] += raw_error_part[c][key]
+
+        # first overflow
+        if not coords:
             raw_error[:] = raw_error_part[:]
         # not first overflow
         else:
