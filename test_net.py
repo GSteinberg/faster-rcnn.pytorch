@@ -17,6 +17,7 @@ import math
 import argparse
 import pprint
 import pdb
+import utm
 import json
 import time
 
@@ -505,7 +506,6 @@ if __name__ == '__main__':
             for orth in coords_part.keys():
                 if orth in coords.keys(): coords[orth].extend(coords_part[orth])
                 else: coords[orth] = coords_part[orth]
-        pdb.set_trace()
     
     # calculate precision, recall, F1 for each class and all classes
     rel_error = [{"prec":0, "recall":0, "f1":0} for _ in range(len(classes))]
