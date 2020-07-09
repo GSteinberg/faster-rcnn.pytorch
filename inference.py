@@ -257,16 +257,16 @@ def test():
     while i < num_images:
 
     	# load image
-        im_file = os.path.join(args.image_dir, imglist[num_images])
+        im_file = os.path.join(args.image_dir, imglist[i])
         im = cv2.imread(im_file)
 
-		blobs, im_scales = _get_image_blob(im)
+        blobs, im_scales = _get_image_blob(im)
         assert len(im_scales) == 1, "Only single-image batch implemented"
         im_blob = blobs
-        im_info_np = np.array([[im_blob.shape[1], im_blob.shape[2], 
+        im_info_np = np.array([[im_blob.shape[1], im_blob.shape[2],
                 im_scales[0]]], dtype=np.float32)
 
-    	im_data_pt = torch.from_numpy(im_blob)
+        im_data_pt = torch.from_numpy(im_blob)
         im_data_pt = im_data_pt.permute(0, 3, 1, 2)
         im_info_pt = torch.from_numpy(im_info_np)
 
