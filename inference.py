@@ -155,10 +155,11 @@ def test():
 
     cfg.TRAIN.USE_FLIPPED = False
 
-    # imdb, roidb, ratio_list, ratio_index = combined_roidb(args.imdbval_name, False)
-    # imdb.competition_mode(on=True)
+    # load ground truth
+    imdb, roidb, ratio_list, ratio_index = combined_roidb(args.imdbval_name, False)
+    imdb.competition_mode(on=True)
 
-    # print('{:d} roidb entries'.format(len(roidb)))
+    print('{:d} roidb entries'.format(len(roidb)))
 
     input_dir = args.load_dir + "/" + args.net + "/" + args.dataset
     if not os.path.exists(input_dir):
@@ -225,13 +226,14 @@ def test():
     else:
         thresh = 0.0
 
-    # image and annotations loading
+    # image loading
     imglist = os.listdir(args.image_dir)
     num_images = len(imglist)
 
     print('Loaded Photo: {} images.'.format(num_images))
 
     # save_name = 'faster_rcnn_10'
+    # num_images = len(imdb.image_index)
     all_boxes = [[[] for _ in xrange(num_images)]
                  for _ in xrange(num_classes)]
 
@@ -250,6 +252,7 @@ def test():
     fasterRCNN.eval()
     empty_array = np.transpose(np.array([[],[],[],[],[]]), (1,0))
     
+    raw_error = [{"tp":0, "fp":0, "tn":0, "fn":0} for _ in range(imdb.num_classes)]
     i = 0
     coords = {}     # coordiantes for predicted boxes
     # for each image
@@ -270,6 +273,12 @@ def test():
         im_info_pt = torch.from_numpy(im_info_np)
 
         # data = next(data_iter)
+        # with torch.no_grad():
+        #     im_data.resize_(data[0].size()).copy_(data[0])
+        #     im_info.resize_(data[1].size()).copy_(data[1])
+        #     gt_boxes.resize_(data[2].size()).copy_(data[2])
+        #     num_boxes.resize_(data[3].size()).copy_(data[3])
+
         with torch.no_grad():
             im_data.resize_(im_data_pt.size()).copy_(im_data_pt)
             im_info.resize_(im_info_pt.size()).copy_(im_info_pt)
@@ -315,6 +324,7 @@ def test():
             # Simply repeat the boxes, once for each class
             pred_boxes = np.tile(boxes, (1, scores.shape[1]))
 
+        # pred_boxes /= data[1][0][2].item()
         pred_boxes /= im_scales[0]
 
         scores = scores.squeeze()
@@ -370,15 +380,20 @@ def test():
         if vis:
             cv2.imwrite('result.png', im2show)
 
-        # get center pxl for each ground truth box
-        # center_truth = [[] for _ in range(num_classes)]
-        # box_idx = 0
-        # for box in roidb[i]['boxes']:
-        #     center_truth[roidb[i]['gt_classes'][box_idx]].append( 
-        #             (np.average([box[0], box[2]]), np.average([box[1], box[3]])) )
-        #     box_idx+=1
-
         # calculate precision, recall and F1 for each class
+        # roidb[i]['image']       - image file path
+        # roidb[i]['boxes']       - all bounding boxes
+        # roidb[i]['gt_classes']  - class index for each bounding box
+        # all_boxes[1][i]         - all predicted boxes for first class
+
+        # get center pxl for each ground truth box
+        center_truth = [[] for _ in range(num_classes)]
+        box_idx = 0
+        for box in roidb[i]['boxes']:
+            center_truth[roidb[i]['gt_classes'][box_idx]].append( 
+                    (np.average([box[0], box[2]]), np.average([box[1], box[3]])) )
+            box_idx+=1
+
         # center pxl for each pred box
         pred_thresh = 0.4
         center_pred = [[] for _ in range(num_classes)]
@@ -397,11 +412,9 @@ def test():
             # for predicted box of class c
             # uniq_preds = 0
             for prd in center_pred[c]:
-                # pure inference
-                # if args.inf:
+                # PURE INFERENCE
                 # row and col of image in respective orthophoto (img_ortho)
                 # to calculate position and coordinates in ortho scale
-                # split_img_name = roidb[i]['image'].split("_Split")
                 split_img_name = imglist[i].split("_Split")
                 img_row, img_col = int(split_img_name[1][:2]), \
                                    int(split_img_name[1][2:4])
@@ -439,36 +452,36 @@ def test():
 
                 coords[img_ortho].append([pascal_classes[c], easting + (ortho_x*x_res), 
                         northing + (ortho_y*y_res)])
-            #     # validation
-            #     # else:
-            #     match = False
-            #     # for ground truth box of class c
-            #     for tru in center_truth[c]:
-            #         dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(prd,tru)]))
-            #         # TP: pred px matches ground truth px only once
-            #         if dist < min_dist and not match: 
-            #             raw_error[c]['tp'] += 1
-            #             uniq_preds+=1
-            #             match = True
-            #         # FP: duplicate pred boxes
-            #         elif dist < min_dist and match:
-            #             raw_error[c]['fp'] += 1
+
+                # VALIDATION
+                match = False
+                # for ground truth box of class c
+                for tru in center_truth[c]:
+                    dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(prd,tru)]))
+                    # TP: pred px matches ground truth px only once
+                    if dist < min_dist and not match: 
+                        raw_error[c]['tp'] += 1
+                        uniq_preds+=1
+                        match = True
+                    # FP: duplicate pred boxes
+                    elif dist < min_dist and match:
+                        raw_error[c]['fp'] += 1
                 
-            #     # FP: no truth box to match pred box
-            #     if not match: 
-            #         raw_error[c]['fp'] += 1
+                # FP: no truth box to match pred box
+                if not match: 
+                    raw_error[c]['fp'] += 1
             
-            # # FN: if total # ground truths < accurately predicted boxes
-            # if uniq_preds < len(center_truth[c]):
-            #     raw_error[c]['fn'] += len(center_truth[c]) - uniq_preds
+            # FN: if total # ground truths < accurately predicted boxes
+            if uniq_preds < len(center_truth[c]):
+                raw_error[c]['fn'] += len(center_truth[c]) - uniq_preds
         i+=1
 
     # total fp, tp, fn
-    # raw_total = {'tp':0, 'fp':0, 'tn':0, 'fn':0}
-    # for key in raw_total.keys():
-    #     raw_total[key] = sum(raw_error[c][key] for c in range(1,num_classes))
+    raw_total = {'tp':0, 'fp':0, 'tn':0, 'fn':0}
+    for key in raw_total.keys():
+        raw_total[key] = sum(raw_error[c][key] for c in range(1,num_classes))
 
-    # raw_error.append(raw_total)
+    raw_error.append(raw_total)
 
     end = time.time()
     print("test time: %0.4fs" % (end - start))
@@ -476,8 +489,7 @@ def test():
     # end of testing
     if i == num_images: 
         i = -1
-    return i, pascal_classes, coords
-    # return i, pascal_classes, raw_error, coords
+    return i, pascal_classes, raw_error, coords
 
 if __name__ == '__main__':
     # create a backup of test.txt
@@ -486,7 +498,7 @@ if __name__ == '__main__':
     copyfile(test_pth, test_full_pth)
 
     start_idx = 0
-    # raw_error = []
+    raw_error = []
     coords = {}
     while start_idx >= 0:
         # Edit test.txt to start at start_idx
@@ -496,8 +508,7 @@ if __name__ == '__main__':
             for i in range(start_idx, len(all_lines)):
                 f.write(all_lines[i] + "\n")
 
-        # crash_idx, classes, raw_error_part, coords_part = test()
-        crash_idx, classes, coords_part = test()
+        crash_idx, classes, raw_error_part, coords_part = test()
         torch.cuda.empty_cache()
 
         if crash_idx == -1:
@@ -506,13 +517,13 @@ if __name__ == '__main__':
             start_idx += crash_idx
 
         # first overflow
-        # if not raw_error:
-        #     raw_error[:] = raw_error_part[:]
-        # # not first overflow
-        # else:
-        #     for c in range(len(raw_error_part)):
-        #         for key in raw_error_part[c].keys():
-        #             raw_error[c][key] += raw_error_part[c][key]
+        if not raw_error:
+            raw_error[:] = raw_error_part[:]
+        # not first overflow
+        else:
+            for c in range(len(raw_error_part)):
+                for key in raw_error_part[c].keys():
+                    raw_error[c][key] += raw_error_part[c][key]
 
         # first overflow
         if not coords:
@@ -523,6 +534,40 @@ if __name__ == '__main__':
                 if orth in coords.keys(): coords[orth].extend(coords_part[orth])
                 else: coords[orth] = coords_part[orth]
 
+
+    # calculate precision, recall, F1 for each class and all classes
+    rel_error = [{"prec":0, "recall":0, "f1":0} for _ in range(len(classes))]
+    for c in range(1, len(classes)):
+        if classes[c] == "dummy" or raw_error[c]['tp'] == 0: continue
+
+        # precision - tp/(tp+fp)
+        rel_error[c]['prec'] = raw_error[c]['tp'] / (raw_error[c]['tp']+raw_error[c]['fp'])
+        # recall - tp/(tp+fn)
+        rel_error[c]['recall'] = raw_error[c]['tp'] / (raw_error[c]['tp']+raw_error[c]['fn'])
+        # f1 - 2*[(prec*rec)/(prec+rec)]
+        rel_error[c]['f1'] = 2 * \
+                ((rel_error[c]['prec'] * rel_error[c]['recall']) / \
+                 (rel_error[c]['prec'] + rel_error[c]['recall']))
+
+    # average prec, recall, f1
+    rel_total = {"prec":0, "recall":0, "f1":0}
+    for key in rel_total.keys():
+        rel_total[key] = np.average(
+            [rel_error[c][key] for c in range(1, len(classes)) if classes[c] != "dummy"])
+
+    rel_error.append(rel_total)
+
+    with open("output/csvs/error_report.csv","w", newline='') as f:
+        writer = csv.writer(f)
+
+        writer.writerow(["----"] + list(classes[1:]) + ["total"])
+        for key in raw_error[0].keys():
+            writer.writerow([key] + 
+                    [raw_error[i][key] for i in range(1,len(raw_error))])
+        writer.writerow(['----'])
+        for key in rel_error[0].keys():
+            writer.writerow([key] + 
+                    [rel_error[i][key] for i in range(1,len(rel_error))])
 
     # convert utm to lat long
     for img_name in coords.keys():

@@ -275,12 +275,14 @@ def test():
             if cfg.TRAIN.BBOX_NORMALIZE_TARGETS_PRECOMPUTED:
                 # Optionally normalize targets by a precomputed mean and stdev
                 if args.class_agnostic:
-                    box_deltas = box_deltas.view(-1, 4) * torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS).cuda() \
-                               + torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS).cuda()
+                    box_deltas = box_deltas.view(-1, 4) \
+                                * torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS).cuda() \
+                                + torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS).cuda()
                     box_deltas = box_deltas.view(1, -1, 4)
                 else:
-                    box_deltas = box_deltas.view(-1, 4) * torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS).cuda() \
-                               + torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS).cuda()
+                    box_deltas = box_deltas.view(-1, 4) \
+                                * torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS).cuda() \
+                                + torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS).cuda()
                     box_deltas = box_deltas.view(1, -1, 4 * len(imdb.classes))
 
             pred_boxes = bbox_transform_inv(boxes, box_deltas, 1)
@@ -302,6 +304,8 @@ def test():
         
         # for each class in each image
         for j in xrange(1, imdb.num_classes):
+            if pascal_classes[j] == "dummy": continue
+
             inds = torch.nonzero(scores[:,j]>thresh).view(-1)
             # if there is det
             if inds.numel() > 0:
@@ -363,16 +367,6 @@ def test():
             for box in all_boxes[c][i]:
                 # if score for that box > prediction threshold
                 if box[4] >= pred_thresh:
-                    # print()
-                    # print('image: {}'.format(roidb[i]['image']))
-                    # print('class: {}'.format(imdb.classes[c]))
-                    # print('xmin: {}'.format(box[0]))
-                    # print('xmax: {}'.format(box[2]))
-                    # print('ymin: {}'.format(box[1]))
-                    # print('ymax: {}'.format(box[3]))
-                    # print('score: {}'.format(box[4]))
-                    # print()
-
                     center_pred[c].append(
                             (np.average([box[0], box[2]]), np.average([box[1], box[3]])) )
 
@@ -384,8 +378,7 @@ def test():
             # for predicted box of class c
             uniq_preds = 0
             for prd in center_pred[c]:
-                # pure inference
-                # if args.inf:
+                # PURE INFERENCE
                 # row and col of image in respective orthophoto (img_ortho)
                 # to calculate position and coordinates in ortho scale
                 split_img_name = roidb[i]['image'].split("_Split")
@@ -425,8 +418,8 @@ def test():
 
                 coords[img_ortho].append([imdb.classes[c], easting + (ortho_x*x_res), 
                         northing + (ortho_y*y_res)])
-                # validation
-                # else:
+
+                # VALIDATION
                 match = False
                 # for ground truth box of class c
                 for tru in center_truth[c]:
