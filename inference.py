@@ -250,7 +250,6 @@ def test():
     fasterRCNN.eval()
     empty_array = np.transpose(np.array([[],[],[],[],[]]), (1,0))
     
-    raw_error = [{"tp":0, "fp":0, "tn":0, "fn":0} for _ in range(num_classes)]
     i = 0
     coords = {}     # coordiantes for predicted boxes
     # for each image
@@ -316,7 +315,7 @@ def test():
             # Simply repeat the boxes, once for each class
             pred_boxes = np.tile(boxes, (1, scores.shape[1]))
 
-        pred_boxes /= data[1][0][2].item()
+        pred_boxes /= im_scales[0]
 
         scores = scores.squeeze()
         pred_boxes = pred_boxes.squeeze()
@@ -352,7 +351,7 @@ def test():
                 all_boxes[j][i] = empty_array
          
         # Limit to max_per_image detections *over all classes*
-        if max_per_image > 0:
+        if max_per_image > 0 and all_boxes[j][i]:
             image_scores = np.hstack([all_boxes[j][i][:, -1]
                                       for j in xrange(1, num_classes)])
             if len(image_scores) > max_per_image:
@@ -371,12 +370,6 @@ def test():
         if vis:
             cv2.imwrite('result.png', im2show)
 
-        # calculate precision, recall and F1 for each class
-        # roidb[i]['image']       - image file path
-        # roidb[i]['boxes']       - all bounding boxes
-        # roidb[i]['gt_classes']  - class index for each bounding box
-        # all_boxes[1][i]         - all predicted boxes for first class
-        
         # get center pxl for each ground truth box
         # center_truth = [[] for _ in range(num_classes)]
         # box_idx = 0
@@ -385,6 +378,7 @@ def test():
         #             (np.average([box[0], box[2]]), np.average([box[1], box[3]])) )
         #     box_idx+=1
 
+        # calculate precision, recall and F1 for each class
         # center pxl for each pred box
         pred_thresh = 0.4
         center_pred = [[] for _ in range(num_classes)]
@@ -401,14 +395,14 @@ def test():
             if pascal_classes[c] == "dummy": continue
 
             # for predicted box of class c
-            uniq_preds = 0
+            # uniq_preds = 0
             for prd in center_pred[c]:
                 # pure inference
                 # if args.inf:
                 # row and col of image in respective orthophoto (img_ortho)
                 # to calculate position and coordinates in ortho scale
                 # split_img_name = roidb[i]['image'].split("_Split")
-                split_img_name = imglist[num_images].split("_Split")
+                split_img_name = imglist[i].split("_Split")
                 img_row, img_col = int(split_img_name[1][:2]), \
                                    int(split_img_name[1][2:4])
                 img_ortho = split_img_name[0].split("/")[-1]
