@@ -410,7 +410,7 @@ def test():
             if pascal_classes[c] == "dummy": continue
 
             # for predicted box of class c
-            # uniq_preds = 0
+            uniq_preds = 0
             for prd in center_pred[c]:
                 # PURE INFERENCE
                 # row and col of image in respective orthophoto (img_ortho)
