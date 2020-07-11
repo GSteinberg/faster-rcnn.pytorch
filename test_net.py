@@ -8,7 +8,6 @@ from __future__ import division
 from __future__ import print_function
 
 import csv
-import copy
 import _init_paths
 import os
 import sys
@@ -17,7 +16,6 @@ import math
 import argparse
 import pprint
 import pdb
-import utm
 import json
 import time
 
@@ -92,15 +90,6 @@ def parse_args():
     parser.add_argument('--vis', dest='vis',
                         help='visualization mode',
                         action='store_true')
-    parser.add_argument('--inference', dest='inf',
-                        help='pure inference mode',
-                        action='store_true')
-    parser.add_argument('--crop_size', dest='cropped_img_size',
-                      help='size at which ImageSplitter splits orthos',
-                      default=-1, type=int)
-    parser.add_argument('--crop_stride', dest='cropped_img_stride',
-                      help='stride ImageSplitter uses to split orthos',
-                      default=-1, type=int)
     args = parser.parse_args()
     return args
 
@@ -241,7 +230,6 @@ def test():
     
     raw_error = [{"tp":0, "fp":0, "tn":0, "fn":0} for _ in range(imdb.num_classes)]
     i = 0
-    coords = {}     # coordiantes for predicted boxes
     # for each image
     while i < num_images:
 
@@ -304,7 +292,7 @@ def test():
         
         # for each class in each image
         for j in xrange(1, imdb.num_classes):
-            if pascal_classes[j] == "dummy": continue
+            if imdb.classes[j] == "dummy": continue
 
             inds = torch.nonzero(scores[:,j]>thresh).view(-1)
             # if there is det
@@ -378,48 +366,6 @@ def test():
             # for predicted box of class c
             uniq_preds = 0
             for prd in center_pred[c]:
-                # PURE INFERENCE
-                # row and col of image in respective orthophoto (img_ortho)
-                # to calculate position and coordinates in ortho scale
-                split_img_name = roidb[i]['image'].split("_Split")
-                img_row, img_col = int(split_img_name[1][:2]), \
-                                   int(split_img_name[1][2:4])
-                img_ortho = split_img_name[0].split("/")[-1]
-
-                # converting to orthophoto scale
-                size_minus_stride = args.cropped_img_size - args.cropped_img_stride
-                ortho_x, ortho_y = prd[0] + (img_col*size_minus_stride), \
-                                   prd[1] + (img_row*size_minus_stride)
-
-                # fetch respective ortho metadata
-                img_to_dir = ""
-                if "Mar16" in img_ortho:
-                    img_to_dir = "Mar16Grass"
-                elif "Grass" in img_ortho:
-                    img_to_dir = "grassOrth"
-                elif "Test" in img_ortho:
-                    img_to_dir = "rubbOrth2"
-                elif "Rubble" in img_ortho:
-                    img_to_dir = "rubbOrth1"
-                elif "Sand" in img_ortho:
-                    img_to_dir = "May13Sand"
-                ortho_dir = os.path.join("../../OrthoData/" + img_to_dir + "/images",
-                            img_ortho + ".tfw")
-                f = open(ortho_dir, "r")
-                metadata = f.read().split("\n")[:-1]
-                f.close()
-
-                x_res, y_res, easting, northing = \
-                        float(metadata[0]), float(metadata[3]), \
-                        float(metadata[4]), float(metadata[5])
-
-                if img_ortho not in coords.keys():
-                    coords[img_ortho] = []
-
-                coords[img_ortho].append([imdb.classes[c], easting + (ortho_x*x_res), 
-                        northing + (ortho_y*y_res)])
-
-                # VALIDATION
                 match = False
                 # for ground truth box of class c
                 for tru in center_truth[c]:
@@ -449,13 +395,19 @@ def test():
 
     raw_error.append(raw_total)
 
+    # with open(det_file, 'wb') as f:
+    #     pickle.dump(all_boxes, f, pickle.HIGHEST_PROTOCOL)
+
+    # print('Evaluating detections')
+    # imdb.evaluate_detections(all_boxes, output_dir)
+
     end = time.time()
     print("test time: %0.4fs" % (end - start))
 
     # end of testing
     if i == num_images: 
         i = -1
-    return i, imdb.classes, raw_error, coords
+    return i, imdb.classes, raw_error
 
 if __name__ == '__main__':
     # create a backup of test.txt
@@ -465,7 +417,6 @@ if __name__ == '__main__':
 
     start_idx = 0
     raw_error = []
-    coords = {}
     while start_idx >= 0:
         # Edit test.txt to start at start_idx
         with open(test_pth, "w") as f, open(test_full_pth, "r") as f_full:
@@ -474,7 +425,7 @@ if __name__ == '__main__':
             for i in range(start_idx, len(all_lines)):
                 f.write(all_lines[i] + "\n")
 
-        crash_idx, classes, raw_error_part, coords_part = test()
+        crash_idx, classes, raw_error_part = test()
         torch.cuda.empty_cache()
 
         if crash_idx == -1:
@@ -490,15 +441,6 @@ if __name__ == '__main__':
             for c in range(len(raw_error_part)):
                 for key in raw_error_part[c].keys():
                     raw_error[c][key] += raw_error_part[c][key]
-
-        # first overflow
-        if not coords:
-            coords = copy.deepcopy(coords_part)
-        # not first overflow
-        else:
-            for orth in coords_part.keys():
-                if orth in coords.keys(): coords[orth].extend(coords_part[orth])
-                else: coords[orth] = coords_part[orth]
     
     # calculate precision, recall, F1 for each class and all classes
     rel_error = [{"prec":0, "recall":0, "f1":0} for _ in range(len(classes))]
@@ -533,26 +475,3 @@ if __name__ == '__main__':
         for key in rel_error[0].keys():
             writer.writerow([key] + 
                     [rel_error[i][key] for i in range(1,len(rel_error))])
-
-    # convert utm to lat long
-    for img_name in coords.keys():
-        for pnt in range(len(coords[img_name])):
-            lat_long = utm.to_latlon(coords[img_name][pnt][1], \
-                    coords[img_name][pnt][2], 18, 'T')
-            coords[img_name][pnt].extend(lat_long)
-
-    # coords for each ortho
-    for img_name in coords.keys():
-        with open("output/csvs/" + img_name + '_coords.csv', 'w', newline='') as csvfile:
-            writer = csv.writer(csvfile)
-            writer.writerow(["Object", "Easting", "Northing", "Latitude", "Longitude"])
-            for c in coords[img_name]:
-                writer.writerow(c[:])
-        
-    # All coords from all orthos
-    with open('output/csvs/all_coords.csv', 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(["Photo", "Object", "Easting", "Northing", "Latitude", "Longitude"])
-        for img_name in coords:
-            for c in coords[img_name]:
-                writer.writerow([img_name] + c[:])
