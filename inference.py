@@ -154,7 +154,6 @@ def test():
     pprint.pprint(cfg)
 
     cfg.TRAIN.USE_FLIPPED = False
-
     # load ground truth
     imdb, roidb, ratio_list, ratio_index = combined_roidb(args.imdbval_name, False)
     imdb.competition_mode(on=True)
@@ -226,7 +225,6 @@ def test():
     else:
         thresh = 0.0
 
-    # image loading
     imglist = os.listdir(args.image_dir)
     num_images = len(imglist)
 
@@ -237,6 +235,7 @@ def test():
     all_boxes = [[[] for _ in xrange(num_images)]
                  for _ in xrange(num_classes)]
 
+    # data loading
     # output_dir = get_output_dir(imdb, save_name)
     # dataset = roibatchLoader(roidb, ratio_list, ratio_index, 1, \
     #                          num_classes, training=False, normalize = False)
@@ -252,7 +251,7 @@ def test():
     fasterRCNN.eval()
     empty_array = np.transpose(np.array([[],[],[],[],[]]), (1,0))
     
-    raw_error = [{"tp":0, "fp":0, "tn":0, "fn":0} for _ in range(imdb.num_classes)]
+    raw_error = [{"tp":0, "fp":0, "tn":0, "fn":0} for _ in range(num_classes)]
     i = 0
     coords = {}     # coordiantes for predicted boxes
     # for each image
@@ -309,13 +308,13 @@ def test():
                 # Optionally normalize targets by a precomputed mean and stdev
                 if args.class_agnostic:
                     box_deltas = box_deltas.view(-1, 4) \
-                    			* torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS).cuda() \
-                               	+ torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS).cuda()
+                                * torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS).cuda() \
+                                + torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS).cuda()
                     box_deltas = box_deltas.view(1, -1, 4)
                 else:
                     box_deltas = box_deltas.view(-1, 4) \
-                    			* torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS).cuda() \
-                               	+ torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS).cuda()
+                                * torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS).cuda() \
+                                + torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS).cuda()
                     box_deltas = box_deltas.view(1, -1, 4 * len(pascal_classes))
 
             pred_boxes = bbox_transform_inv(boxes, box_deltas, 1)

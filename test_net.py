@@ -143,6 +143,9 @@ def test():
     imdb, roidb, ratio_list, ratio_index = combined_roidb(args.imdbval_name, False)
     imdb.competition_mode(on=True)
 
+    pascal_classes = imdb.classes
+    num_classes = imdb.num_classes
+
     print('{:d} roidb entries'.format(len(roidb)))
 
     input_dir = args.load_dir + "/" + args.net + "/" + args.dataset
@@ -153,13 +156,13 @@ def test():
 
     # initilize the network here.
     if args.net == 'vgg16':
-        fasterRCNN = vgg16(imdb.classes, pretrained=False, class_agnostic=args.class_agnostic)
+        fasterRCNN = vgg16(pascal_classes, pretrained=False, class_agnostic=args.class_agnostic)
     elif args.net == 'res101':
-        fasterRCNN = resnet(imdb.classes, 101, pretrained=False, class_agnostic=args.class_agnostic)
+        fasterRCNN = resnet(pascal_classes, 101, pretrained=False, class_agnostic=args.class_agnostic)
     elif args.net == 'res50':
-        fasterRCNN = resnet(imdb.classes, 50, pretrained=False, class_agnostic=args.class_agnostic)
+        fasterRCNN = resnet(pascal_classes, 50, pretrained=False, class_agnostic=args.class_agnostic)
     elif args.net == 'res152':
-        fasterRCNN = resnet(imdb.classes, 152, pretrained=False, class_agnostic=args.class_agnostic)
+        fasterRCNN = resnet(pascal_classes, 152, pretrained=False, class_agnostic=args.class_agnostic)
     else:
         print("network is not defined")
 
@@ -211,11 +214,12 @@ def test():
     save_name = 'faster_rcnn_10'
     num_images = len(imdb.image_index)
     all_boxes = [[[] for _ in xrange(num_images)]
-                 for _ in xrange(imdb.num_classes)]
+                 for _ in xrange(num_classes)]
 
+    # data loading
     output_dir = get_output_dir(imdb, save_name)
     dataset = roibatchLoader(roidb, ratio_list, ratio_index, 1, \
-                             imdb.num_classes, training=False, normalize = False)
+                             num_classes, training=False, normalize = False)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=1,
                               shuffle=False, num_workers=0,
                               pin_memory=True)
@@ -228,7 +232,7 @@ def test():
     fasterRCNN.eval()
     empty_array = np.transpose(np.array([[],[],[],[],[]]), (1,0))
     
-    raw_error = [{"tp":0, "fp":0, "tn":0, "fn":0} for _ in range(imdb.num_classes)]
+    raw_error = [{"tp":0, "fp":0, "tn":0, "fn":0} for _ in range(num_classes)]
     i = 0
     # for each image
     while i < num_images:
@@ -271,7 +275,7 @@ def test():
                     box_deltas = box_deltas.view(-1, 4) \
                                 * torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS).cuda() \
                                 + torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS).cuda()
-                    box_deltas = box_deltas.view(1, -1, 4 * len(imdb.classes))
+                    box_deltas = box_deltas.view(1, -1, 4 * len(pascal_classes))
 
             pred_boxes = bbox_transform_inv(boxes, box_deltas, 1)
             pred_boxes = clip_boxes(pred_boxes, im_info.data, 1)
@@ -291,8 +295,8 @@ def test():
             im2show = np.copy(im)
         
         # for each class in each image
-        for j in xrange(1, imdb.num_classes):
-            if imdb.classes[j] == "dummy": continue
+        for j in xrange(1, num_classes):
+            if pascal_classes[j] == "dummy": continue
 
             inds = torch.nonzero(scores[:,j]>thresh).view(-1)
             # if there is det
@@ -309,7 +313,7 @@ def test():
                 keep = nms(cls_boxes[order, :], cls_scores[order], cfg.TEST.NMS)
                 cls_dets = cls_dets[keep.view(-1).long()]
                 if vis:
-                    im2show = vis_detections(im2show, imdb.classes[j], cls_dets.cpu().numpy(), 0.3)
+                    im2show = vis_detections(im2show, pascal_classes[j], cls_dets.cpu().numpy(), 0.3)
                 all_boxes[j][i] = cls_dets.cpu().numpy()
             else:
                 all_boxes[j][i] = empty_array
@@ -317,10 +321,10 @@ def test():
         # Limit to max_per_image detections *over all classes*
         if max_per_image > 0:
             image_scores = np.hstack([all_boxes[j][i][:, -1]
-                                      for j in xrange(1, imdb.num_classes)])
+                                      for j in xrange(1, num_classes)])
             if len(image_scores) > max_per_image:
                 image_thresh = np.sort(image_scores)[-max_per_image]
-                for j in xrange(1, imdb.num_classes):
+                for j in xrange(1, num_classes):
                     keep = np.where(all_boxes[j][i][:, -1] >= image_thresh)[0]
                     all_boxes[j][i] = all_boxes[j][i][keep, :]
 
@@ -341,7 +345,7 @@ def test():
         # all_boxes[1][i]         - all predicted boxes for first class
         
         # get center pxl for each ground truth box
-        center_truth = [[] for _ in range(imdb.num_classes)]
+        center_truth = [[] for _ in range(num_classes)]
         box_idx = 0
         for box in roidb[i]['boxes']:
             center_truth[roidb[i]['gt_classes'][box_idx]].append( 
@@ -350,8 +354,8 @@ def test():
 
         # center pxl for each pred box
         pred_thresh = 0.4
-        center_pred = [[] for _ in range(imdb.num_classes)]
-        for c in range(1,imdb.num_classes):
+        center_pred = [[] for _ in range(num_classes)]
+        for c in range(1,num_classes):
             for box in all_boxes[c][i]:
                 # if score for that box > prediction threshold
                 if box[4] >= pred_thresh:
@@ -360,8 +364,8 @@ def test():
 
         # for each class except background
         min_dist = 8.5
-        for c in range(1, imdb.num_classes):
-            if imdb.classes[c] == "dummy": continue
+        for c in range(1, num_classes):
+            if pascal_classes[c] == "dummy": continue
 
             # for predicted box of class c
             uniq_preds = 0
@@ -391,7 +395,7 @@ def test():
     # total fp, tp, fn
     raw_total = {'tp':0, 'fp':0, 'tn':0, 'fn':0}
     for key in raw_total.keys():
-        raw_total[key] = sum(raw_error[c][key] for c in range(1,imdb.num_classes))
+        raw_total[key] = sum(raw_error[c][key] for c in range(1,num_classes))
 
     raw_error.append(raw_total)
 
@@ -407,7 +411,7 @@ def test():
     # end of testing
     if i == num_images: 
         i = -1
-    return i, imdb.classes, raw_error
+    return i, pascal_classes, raw_error
 
 if __name__ == '__main__':
     # create a backup of test.txt
