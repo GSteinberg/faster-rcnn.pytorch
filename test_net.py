@@ -319,7 +319,7 @@ def test():
                 all_boxes[j][i] = empty_array
          
         # Limit to max_per_image detections *over all classes*
-        if max_per_image > 0:
+        if max_per_image > 0 and all_boxes[j][i]:
             image_scores = np.hstack([all_boxes[j][i][:, -1]
                                       for j in xrange(1, num_classes)])
             if len(image_scores) > max_per_image:
@@ -434,6 +434,8 @@ if __name__ == '__main__':
 
         if crash_idx == -1:
             start_idx = -1
+        elif crash_idx == 0:
+            start_idx += 1
         else:
             start_idx += crash_idx
 
