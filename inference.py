@@ -237,13 +237,13 @@ def test():
 
     # data loading
     # output_dir = get_output_dir(imdb, save_name)
-    # dataset = roibatchLoader(roidb, ratio_list, ratio_index, 1, \
-    #                          num_classes, training=False, normalize = False)
-    # dataloader = torch.utils.data.DataLoader(dataset, batch_size=1,
-    #                           shuffle=False, num_workers=0,
-    #                           pin_memory=True)
+    dataset = roibatchLoader(roidb, ratio_list, ratio_index, 1, \
+                             num_classes, training=False, normalize = False)
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=1,
+                              shuffle=False, num_workers=0,
+                              pin_memory=True)
 
-    # data_iter = iter(dataloader)
+    data_iter = iter(dataloader)
 
     # _t = {'im_detect': time.time(), 'misc': time.time()}
     # det_file = os.path.join(output_dir, 'detections.pkl')
@@ -258,29 +258,29 @@ def test():
     while i < num_images:
 
     	# load image
-        im_file = os.path.join(args.image_dir, imglist[i])
-        im = cv2.imread(im_file)
+        # im_file = os.path.join(args.image_dir, imglist[i])
+        # im = cv2.imread(im_file)
 
-        blobs, im_scales = _get_image_blob(im)
-        assert len(im_scales) == 1, "Only single-image batch implemented"
-        im_blob = blobs
-        im_info_np = np.array([[im_blob.shape[1], im_blob.shape[2],
-                im_scales[0]]], dtype=np.float32)
+        # blobs, im_scales = _get_image_blob(im)
+        # assert len(im_scales) == 1, "Only single-image batch implemented"
+        # im_blob = blobs
+        # im_info_np = np.array([[im_blob.shape[1], im_blob.shape[2],
+        #         im_scales[0]]], dtype=np.float32)
 
-        im_data_pt = torch.from_numpy(im_blob)
-        im_data_pt = im_data_pt.permute(0, 3, 1, 2)
-        im_info_pt = torch.from_numpy(im_info_np)
+        # im_data_pt = torch.from_numpy(im_blob)
+        # im_data_pt = im_data_pt.permute(0, 3, 1, 2)
+        # im_info_pt = torch.from_numpy(im_info_np)
 
-        # data = next(data_iter)
         # with torch.no_grad():
         #     im_data.resize_(data[0].size()).copy_(data[0])
         #     im_info.resize_(data[1].size()).copy_(data[1])
         #     gt_boxes.resize_(data[2].size()).copy_(data[2])
         #     num_boxes.resize_(data[3].size()).copy_(data[3])
 
+        data = next(data_iter)
         with torch.no_grad():
-            im_data.resize_(im_data_pt.size()).copy_(im_data_pt)
-            im_info.resize_(im_info_pt.size()).copy_(im_info_pt)
+            im_data.resize_(data[0].size()).copy_(data[0])
+            im_info.resize_(data[1].size()).copy_(data[1])
             gt_boxes.resize_(1, 1, 5).zero_()
             num_boxes.resize_(1).zero_()
 
@@ -323,8 +323,8 @@ def test():
             # Simply repeat the boxes, once for each class
             pred_boxes = np.tile(boxes, (1, scores.shape[1]))
 
-        # pred_boxes /= data[1][0][2].item()
-        pred_boxes /= im_scales[0]
+        pred_boxes /= data[1][0][2].item()
+        # pred_boxes /= im_scales[0]
 
         scores = scores.squeeze()
         pred_boxes = pred_boxes.squeeze()
@@ -507,11 +507,14 @@ if __name__ == '__main__':
             for i in range(start_idx, len(all_lines)):
                 f.write(all_lines[i] + "\n")
 
+        pdb.set_trace()
         crash_idx, classes, raw_error_part, coords_part = test()
         torch.cuda.empty_cache()
 
         if crash_idx == -1:
             start_idx = -1
+        elif crash_idx == 0:
+            start_idx += 1
         else:
             start_idx += crash_idx
 
