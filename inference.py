@@ -396,12 +396,15 @@ def test():
         # center pxl for each pred box
         pred_thresh = 0.4
         center_pred = [[] for _ in range(num_classes)]
+        final_scores = []
         for c in range(1,num_classes):
             for box in all_boxes[c][i]:
                 # if score for that box > prediction threshold
                 if box[4] >= pred_thresh:
                     center_pred[c].append(
                             (np.average([box[0], box[2]]), np.average([box[1], box[3]])) )
+                    final_scores.append(box[4])
+
 
         # for each class except background
         min_dist = 8.5
@@ -410,7 +413,7 @@ def test():
 
             # for predicted box of class c
             uniq_preds = 0
-            for prd in center_pred[c]:
+            for prd_idx, prd in enumerate(center_pred[c]):
                 # PURE INFERENCE
                 # row and col of image in respective orthophoto (img_ortho)
                 # to calculate position and coordinates in ortho scale
@@ -443,14 +446,14 @@ def test():
                 f.close()
 
                 x_res, y_res, easting, northing = \
-                        float(metadata[0]), float(metadata[3]), \
+                        float(metadata[0]), float(metadata[3]), 
                         float(metadata[4]), float(metadata[5])
 
                 if img_ortho not in coords.keys():
                     coords[img_ortho] = []
 
-                coords[img_ortho].append([pascal_classes[c], easting + (ortho_x*x_res), 
-                        northing + (ortho_y*y_res)])
+                coords[img_ortho].append([pascal_classes[c], final_scores[prd_idx],
+                        easting + (ortho_x*x_res), northing + (ortho_y*y_res)])
 
                 # VALIDATION
                 match = False
@@ -582,16 +585,16 @@ if __name__ == '__main__':
     for img_name in coords.keys():
         with open("output/csvs/" + img_name + '_coords.csv', 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(["Object", "Easting", "Northing", "Latitude",
-                    "Longitude", "Score"])
+            writer.writerow(["Object", "Score", "Easting", "Northing",
+                    "Latitude", "Longitude"])
             for c in coords[img_name]:
                 writer.writerow(c[:])
         
     # All coords from all orthos
     with open('output/csvs/all_coords.csv', 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow(["Photo", "Object", "Easting", "Northing", "Latitude", 
-                "Longitude", "Score"])
+        writer.writerow(["Photo", "Object", "Score", "Easting", "Northing",
+                "Latitude", "Longitude"])
         for img_name in coords:
             for c in coords[img_name]:
                 writer.writerow([img_name] + c[:])
