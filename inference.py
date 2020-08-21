@@ -225,13 +225,13 @@ def test():
     else:
         thresh = 0.0
 
-    imglist = os.listdir(args.image_dir)
-    num_images = len(imglist)
+    # imglist = os.listdir(args.image_dir)
+    # num_images = len(imglist)
 
-    print('Loaded Photo: {} images.'.format(num_images))
+    # print('Loaded Photo: {} images.'.format(num_images))
 
     # save_name = 'faster_rcnn_10'
-    # num_images = len(imdb.image_index)
+    num_images = len(imdb.image_index)
     all_boxes = [[[] for _ in xrange(num_images)]
                  for _ in xrange(num_classes)]
 
@@ -417,7 +417,7 @@ def test():
                 # PURE INFERENCE
                 # row and col of image in respective orthophoto (img_ortho)
                 # to calculate position and coordinates in ortho scale
-                split_img_name = imglist[i].split("_Split")
+                split_img_name = roidb[i]['image'].split("_Split")
                 img_row, img_col = int(split_img_name[1][:2]), \
                                    int(split_img_name[1][2:4])
                 img_ortho = split_img_name[0].split("/")[-1]
@@ -446,7 +446,7 @@ def test():
                 f.close()
 
                 x_res, y_res, easting, northing = \
-                        float(metadata[0]), float(metadata[3]), 
+                        float(metadata[0]), float(metadata[3]), \
                         float(metadata[4]), float(metadata[5])
 
                 if img_ortho not in coords.keys():
@@ -510,7 +510,6 @@ if __name__ == '__main__':
             for i in range(start_idx, len(all_lines)):
                 f.write(all_lines[i] + "\n")
 
-        pdb.set_trace()
         crash_idx, classes, raw_error_part, coords_part = test()
         torch.cuda.empty_cache()
 
@@ -577,8 +576,8 @@ if __name__ == '__main__':
     # convert utm to lat long
     for img_name in coords.keys():
         for pnt in range(len(coords[img_name])):
-            lat_long = utm.to_latlon(coords[img_name][pnt][1], \
-                    coords[img_name][pnt][2], 18, 'T')
+            lat_long = utm.to_latlon(coords[img_name][pnt][2], \
+                    coords[img_name][pnt][3], 18, 'T')
             coords[img_name][pnt].extend(lat_long)
 
     # coords for each ortho
