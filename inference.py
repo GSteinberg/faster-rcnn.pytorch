@@ -16,29 +16,23 @@ import numpy as np
 import math
 import argparse
 import pprint
-import pdb
 import utm
-import json
 import time
 
 import cv2
 
 import torch
 from torch.autograd import Variable
-import torch.nn as nn
-import torch.optim as optim
-import pickle
 from shutil import copyfile
 from roi_data_layer.roidb import combined_roidb
 from roi_data_layer.roibatchLoader import roibatchLoader
-from model.utils.config import cfg, cfg_from_file, cfg_from_list, get_output_dir
+from model.utils.config import cfg, cfg_from_file, cfg_from_list
 from model.rpn.bbox_transform import clip_boxes
 from model.roi_layers import nms
 from model.rpn.bbox_transform import bbox_transform_inv
-from model.utils.net_utils import save_net, load_net, vis_detections
+from model.utils.net_utils import vis_detections
 from model.faster_rcnn.vgg16 import vgg16
 from model.faster_rcnn.resnet import resnet
-from demo import _get_image_blob
 
 try:
     xrange          # Python 2
@@ -109,10 +103,6 @@ def parse_args():
     return args
 
 def test():
-    lr = cfg.TRAIN.LEARNING_RATE
-    momentum = cfg.TRAIN.MOMENTUM
-    weight_decay = cfg.TRAIN.WEIGHT_DECAY
-    
     args = parse_args()
 
     print('Called with args:')
@@ -295,7 +285,7 @@ def test():
             if "CUDA out of memory" in err.args[0]:
                 break
             else:
-                print(arr.args[0])
+                print(err.args[0])
                 exit()
 
         scores = cls_prob.data
@@ -354,6 +344,8 @@ def test():
                 keep = nms(cls_boxes[order, :], cls_scores[order], cfg.TEST.NMS)
                 cls_dets = cls_dets[keep.view(-1).long()]
                 if vis:
+                    print("Vis not working yet")
+                    exit(1)
                     im2show = vis_detections(im2show, pascal_classes[j], cls_dets.cpu().numpy(), 0.3)
                 all_boxes[j][i] = cls_dets.cpu().numpy()
             else:
