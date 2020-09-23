@@ -153,6 +153,18 @@ if __name__ == '__main__':
     pprint.pprint(cfg)
     np.random.seed(cfg.RNG_SEED)
 
+
+    ### TOGGLE ###
+    args.imdbval_name = "voc_2007_test"
+
+    cfg.TRAIN.USE_FLIPPED = False
+    # load ground truth
+    imdb, roidb, ratio_list, ratio_index = combined_roidb(args.imdbval_name, False)
+    imdb.competition_mode(on=True)
+
+    print('{:d} roidb entries'.format(len(roidb)))
+    ##############
+
     # train set
     # -- Note: Use validation set and disable the flipped to enable faster loading.
 
@@ -170,6 +182,7 @@ if __name__ == '__main__':
     #                      'motorbike', 'person', 'pottedplant',
     #                      'sheep', 'sofa', 'train', 'tvmonitor'])
     pascal_classes = np.asarray(['__background__', 'pfm-1', 'ksf-casing', 'dummy'])
+    num_classes = len(pascal_classes)
     # initilize the network here.
     if args.net == 'vgg16':
         fasterRCNN = vgg16(pascal_classes, pretrained=False, class_agnostic=args.class_agnostic)
@@ -195,9 +208,6 @@ if __name__ == '__main__':
 
 
     print('load model successfully!')
-
-    print("load checkpoint %s" % (load_name))
-
     # initilize the tensor holder here.
     im_data = torch.FloatTensor(1)
     im_info = torch.FloatTensor(1)
@@ -236,10 +246,24 @@ if __name__ == '__main__':
 
     print('Loaded Photo: {} images.'.format(num_images))
 
+    ### TOGGLE ###
+    # data loading
+    dataset = roibatchLoader(roidb, ratio_list, ratio_index, 1, \
+                             num_classes, training=False, normalize=False)
+    dataloader = torch.utils.data.DataLoader(dataset, batch_size=1,
+                              shuffle=False, num_workers=0,
+                              pin_memory=True)
+
+    data_iter = iter(dataloader)
+
+    raw_error = [{"tp":0, "fp":0, "tn":0, "fn":0} for _ in range(num_classes)]
+    i = 0
+    ##############
     coords = {}     # coordiantes for predicted boxes
-    while num_images >= 0:
+    while i < num_images:
+
         total_tic = time.time()
-        num_images -= 1
+        # num_images -= 1
 
         # Get file
         im_file = os.path.join(args.image_dir, imglist[num_images])
@@ -266,6 +290,10 @@ if __name__ == '__main__':
             im_info.resize_(im_info_pt.size()).copy_(im_info_pt)
             gt_boxes.resize_(1, 1, 5).zero_()
             num_boxes.resize_(1).zero_()
+
+        ### TOGGLE ###
+        data = next(data_iter)
+        ##############
 
         det_tic = time.time()
 
@@ -299,39 +327,6 @@ if __name__ == '__main__':
             # Simply repeat the boxes, once for each class
             pred_boxes = np.tile(boxes, (1, scores.shape[1]))
 
-        # if cfg.TEST.BBOX_REG:
-        #     # Apply bounding-box regression deltas
-        #     box_deltas = bbox_pred.data
-        #     if cfg.TRAIN.BBOX_NORMALIZE_TARGETS_PRECOMPUTED:
-        #     # Optionally normalize targets by a precomputed mean and stdev
-        #         if args.class_agnostic:
-        #             if args.cuda > 0:
-        #                 box_deltas = box_deltas.view(-1, 4) \
-        #                         * torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS).cuda() \
-        #                         + torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS).cuda()
-        #             else:
-        #                 box_deltas = box_deltas.view(-1, 4) \
-        #                         * torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS) \
-        #                         + torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS)
-
-        #             box_deltas = box_deltas.view(1, -1, 4)
-        #         else:
-        #             if args.cuda > 0:
-        #                 box_deltas = box_deltas.view(-1, 4) \
-        #                         * torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS).cuda() \
-        #                         + torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS).cuda()
-        #             else:
-        #                 box_deltas = box_deltas.view(-1, 4) \
-        #                         * torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS) \
-        #                         + torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS)
-        #             box_deltas = box_deltas.view(1, -1, 4 * len(pascal_classes))
-
-        #     pred_boxes = bbox_transform_inv(boxes, box_deltas, 1)
-        #     pred_boxes = clip_boxes(pred_boxes, im_info.data, 1)
-        # else:
-        #     # Simply repeat the boxes, once for each class
-        #     pred_boxes = np.tile(boxes, (1, scores.shape[1]))
-
         pred_boxes /= im_scales[0]
 
         scores = scores.squeeze()
@@ -342,6 +337,19 @@ if __name__ == '__main__':
         if vis:
             im2show = np.copy(im)
 
+        ### TOGGLE ###
+        # get center pxl for each ground truth box
+        center_truth = [[] for _ in range(num_classes)]
+        box_idx = 0
+        for box in roidb[i]['boxes']:
+            center_truth[roidb[i]['gt_classes'][box_idx]].append( 
+                    (np.average([box[0], box[2]]), np.average([box[1], box[3]])) )
+            box_idx+=1
+        ##############
+
+        # get center pxl for each pred box
+        center_pred = [[] for _ in range(num_classes)]
+        final_scores = []
         for j in xrange(1, len(pascal_classes)):
             if pascal_classes[j] == "dummy": continue
             
@@ -359,73 +367,109 @@ if __name__ == '__main__':
                 cls_dets = cls_dets[order]
                 keep = nms(cls_boxes[order, :], cls_scores[order], cfg.TEST.NMS)
                 cls_dets = cls_dets[keep.view(-1).long()]
-            
-                if cls_dets[0][4] >= 0.4:
+      
+                for box in cls_dets:
+                    # if score for that box > prediction threshold
+                    if box[4] >= 0.4:
+                        center_pred[j].append(
+                                (np.average([box[0], box[2]]), np.average([box[1], box[3]])) )
+                        final_scores.append(box[4])
 
-                    # row and col of image in respective orthophoto (img_ortho)
-                    split_img_name = imglist[num_images].split("_Split")
-                    img_row, img_col = int(split_img_name[1][:2]), \
-                                       int(split_img_name[1][2:4])
-                    img_ortho = split_img_name[0]
+        # for each class except background
+        min_dist = 8.5
+        for c in range(1, num_classes):
+            if pascal_classes[c] == "dummy": continue
+
+            # for predicted box of class c
+            uniq_preds = 0
+            for prd_idx, prd in enumerate(center_pred[c]):
+
+                # row and col of image in respective orthophoto (img_ortho)
+                split_img_name = imglist[num_images].split("_Split")
+                img_row, img_col = int(split_img_name[1][:2]), \
+                                   int(split_img_name[1][2:4])
+                img_ortho = split_img_name[0]
                 
-                    # 2 elemt list of pixel of center of landmine
-                    # structure: [average(xmin, xmax), average(ymin, ymax)]
+                # 2 elemt list of pixel of center of landmine
+                # structure: [average(xmin, xmax), average(ymin, ymax)]
 
-                    # print()
-                    # print('image: {}'.format(img_ortho))
-                    # print('class: {}'.format(pascal_classes[j]))
-                    # print('xmin: {}'.format(cls_dets[0][0]))
-                    # print('xmax: {}'.format(cls_dets[0][2]))
-                    # print('ymin: {}'.format(cls_dets[0][1]))
-                    # print('ymax: {}'.format(cls_dets[0][3]))
-                    # print('score: {}'.format(cls_dets[0][4]))
-                    # print()
+                # print()
+                # print('image: {}'.format(img_ortho))
+                # print('class: {}'.format(pascal_classes[j]))
+                # print('xmin: {}'.format(cls_dets[0][0]))
+                # print('xmax: {}'.format(cls_dets[0][2]))
+                # print('ymin: {}'.format(cls_dets[0][1]))
+                # print('ymax: {}'.format(cls_dets[0][3]))
+                # print('score: {}'.format(cls_dets[0][4]))
+                # print()
 
-                    cropped_px = [ int((int(cls_dets[0][0]) + int(cls_dets[0][2])) / 2),
-                                   int((int(cls_dets[0][1]) + int(cls_dets[0][3])) / 2) ]
+                # converting to orthophoto scale
+                size_minus_stride = args.cropped_img_size - args.cropped_img_stride
+                ortho_x, ortho_y = prd[0] + (img_col*size_minus_stride), \
+                                   prd[1] + (img_row*size_minus_stride)
 
-                    # converting to orthophoto scale
-                    size_minus_stride = args.cropped_img_size - args.cropped_img_stride
-                    ortho_x, ortho_y = cropped_px[0] + (img_col*size_minus_stride), \
-                                       cropped_px[1] + (img_row*size_minus_stride)
+                # fetch respective ortho metdata
+                # structure: metadata[0]    == x-pixel res
+                #            metadata[1:3]  == rotational components
+                #            metadata[3]    == y-pixel res
+                #            metadata[4]    == Easting of upper left pixel
+                #            metadata[5]    == Northing of upper left pixel
+                img_to_dir = ""
+                if "Mar16" in img_ortho:
+                    img_to_dir = "Mar16Grass"
+                elif "Grass" in img_ortho:
+                    img_to_dir = "grassOrth"
+                elif "Test" in img_ortho:
+                    img_to_dir = "rubbOrth2"
+                elif "Rubble" in img_ortho:
+                    img_to_dir = "rubbOrth1"
+                elif "Sand" in img_ortho:
+                    img_to_dir = "May13Sand"
+                ortho_dir = os.path.join("../../OrthoData/" + img_to_dir + "/images", \
+                            img_ortho + ".tfw")
+                f = open(ortho_dir, "r")
+                metadata = f.read().split("\n")[:-1]
+                f.close()
 
-                    # fetch respective ortho metdata
-                    # structure: metadata[0]    == x-pixel res
-                    #            metadata[1:3]  == rotational components
-                    #            metadata[3]    == y-pixel res
-                    #            metadata[4]    == Easting of upper left pixel
-                    #            metadata[5]    == Northing of upper left pixel
-                    img_to_dir = ""
-                    if "Mar16" in img_ortho:
-                        img_to_dir = "Mar16Grass"
-                    elif "Grass" in img_ortho:
-                        img_to_dir = "grassOrth"
-                    elif "Test" in img_ortho:
-                        img_to_dir = "rubbOrth2"
-                    elif "Rubble" in img_ortho:
-                        img_to_dir = "rubbOrth1"
-                    elif "Sand" in img_ortho:
-                        img_to_dir = "May13Sand"
-                    ortho_dir = os.path.join("../../OrthoData/" + img_to_dir + "/images", \
-                                img_ortho + ".tfw")
-                    f = open(ortho_dir, "r")
-                    metadata = f.read().split("\n")[:-1]
-                    f.close()
+                x_res, y_res, easting, northing = \
+                        float(metadata[0]), float(metadata[3]), \
+                        float(metadata[4]), float(metadata[5])
 
-                    x_res, y_res, easting, northing = \
-                            float(metadata[0]), float(metadata[3]), \
-                            float(metadata[4]), float(metadata[5])
+                if img_ortho not in coords.keys():
+                    coords[img_ortho] = []
 
-                    if img_ortho not in coords.keys():
-                        coords[img_ortho] = []
-                    coords[img_ortho].append([pascal_classes[j], easting + (ortho_x*x_res), 
-                            northing + (ortho_y*y_res)])
-                    ## ============================================ ##
+                coords[img_ortho].append([pascal_classes[j], final_scores[prd_idx],
+                        easting + (ortho_x*x_res), northing + (ortho_y*y_res)])
 
-                    if vis:
-                        im2show = vis_detections(im2show, pascal_classes[j], \
-                                cls_dets.cpu().numpy(), 0.5)
+                ### TOGGLE ###
+                # VALIDATION
+                match = False
+                # for ground truth box of class c
+                for tru in center_truth[c]:
+                    dist = math.sqrt(sum([(a - b) ** 2 for a, b in zip(prd,tru)]))
+                    # TP: pred px matches ground truth px only once
+                    if dist < min_dist and not match: 
+                        raw_error[c]['tp'] += 1
+                        uniq_preds+=1
+                        match = True
+                    # FP: duplicate pred boxes
+                    elif dist < min_dist and match:
+                        raw_error[c]['fp'] += 1
+                
+                # FP: no truth box to match pred box
+                if not match: 
+                    raw_error[c]['fp'] += 1
+                ##############
 
+                ## ============================================ ##
+
+                if vis:
+                    im2show = vis_detections(im2show, pascal_classes[j], \
+                            cls_dets.cpu().numpy(), 0.5)
+
+            # FN: if total # ground truths < accurately predicted boxes
+            if uniq_preds < len(center_truth[c]):
+                raw_error[c]['fn'] += len(center_truth[c]) - uniq_preds
 
         misc_toc = time.time()
         nms_time = misc_toc - misc_tic
@@ -437,6 +481,10 @@ if __name__ == '__main__':
         if vis:
             result_path = os.path.join(args.image_dir, imglist[num_images][:-4] + "_det.tif")
             cv2.imwrite(result_path, im2show)
+
+        i+=1
+
+    
 
     # convert utm to lat long
     for img_name in coords.keys():
