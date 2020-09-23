@@ -24,6 +24,7 @@ import cv2
 import torch
 from demo import _get_image_blob
 from torch.autograd import Variable
+from scipy.misc import imread
 from shutil import copyfile
 from roi_data_layer.roidb import combined_roidb
 from roi_data_layer.roibatchLoader import roibatchLoader
