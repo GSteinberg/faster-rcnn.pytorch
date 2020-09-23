@@ -7,7 +7,6 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import _init_paths
 import csv
 import os
 import sys
@@ -15,24 +14,16 @@ import utm
 import numpy as np
 import argparse
 import pprint
-import pdb
 import time
 import cv2
 import torch
 from torch.autograd import Variable
-import torch.nn as nn
-import torch.optim as optim
 
-import torchvision.transforms as transforms
-import torchvision.datasets as dset
-import cv2
-from roi_data_layer.roidb import combined_roidb
-from roi_data_layer.roibatchLoader import roibatchLoader
-from model.utils.config import cfg, cfg_from_file, cfg_from_list, get_output_dir
+from model.utils.config import cfg, cfg_from_file, cfg_from_list
 from model.rpn.bbox_transform import clip_boxes
 from model.roi_layers import nms
 from model.rpn.bbox_transform import bbox_transform_inv
-from model.utils.net_utils import save_net, load_net, vis_detections
+from model.utils.net_utils import vis_detections
 from model.utils.blob import im_list_to_blob
 from model.faster_rcnn.vgg16 import vgg16
 from model.faster_rcnn.resnet import resnet
@@ -93,9 +84,6 @@ def parse_args():
     parser.add_argument('--vis', dest='vis',
                       help='visualization mode',
                       action='store_true')
-    parser.add_argument('--webcam_num', dest='webcam_num',
-                      help='webcam ID number',
-                      default=-1, type=int)
     parser.add_argument('--crop_size', dest='cropped_img_size',
                       help='size at which ImageSplitter splits orthos',
                       default=-1, type=int)
@@ -223,11 +211,10 @@ if __name__ == '__main__':
         gt_boxes = gt_boxes.cuda()
 
     # make variable
-    with torch.no_grad():
-        im_data = Variable(im_data)
-        im_info = Variable(im_info)
-        num_boxes = Variable(num_boxes)
-        gt_boxes = Variable(gt_boxes)
+    im_data = Variable(im_data)
+    im_info = Variable(im_info)
+    num_boxes = Variable(num_boxes)
+    gt_boxes = Variable(gt_boxes)
 
     if args.cuda > 0:
         cfg.CUDA = True
@@ -239,36 +226,23 @@ if __name__ == '__main__':
 
     start = time.time()
     max_per_image = 100
-    thresh = 0.05
+    thresh = 0.05 # < maybe this
     vis = True
 
-    webcam_num = args.webcam_num
-    # Set up webcam or get image directories
-    if webcam_num >= 0 :
-        cap = cv2.VideoCapture(webcam_num)
-        num_images = 0
-    else:
-        imglist = os.listdir(args.image_dir)
-        num_images = len(imglist)
+    # get image directories
+    imglist = os.listdir(args.image_dir)
+    num_images = len(imglist)
 
     print('Loaded Photo: {} images.'.format(num_images))
 
     coords = {}     # coordiantes for predicted boxes
-    while (num_images >= 0):
+    while num_images >= 0:
         total_tic = time.time()
-        if webcam_num == -1:
-            num_images -= 1
+        num_images -= 1
 
-        # Get image from the webcam
-        if webcam_num >= 0:
-            if not cap.isOpened():
-                raise RuntimeError("Webcam could not open. Please check connection.")
-            ret, frame = cap.read()
-            im_in = np.array(frame)
-        # Load the demo image
-        else:
-            im_file = os.path.join(args.image_dir, imglist[num_images])
-            im = cv2.imread(im_file)
+        # Get file
+        im_file = os.path.join(args.image_dir, imglist[num_images])
+        im = cv2.imread(im_file)
 
         blobs, im_scales = _get_image_blob(im)
         assert len(im_scales) == 1, "Only single-image batch implemented"
@@ -427,23 +401,13 @@ if __name__ == '__main__':
         misc_toc = time.time()
         nms_time = misc_toc - misc_tic
 
-        if webcam_num == -1:
-            sys.stdout.write('im_detect: {:d}/{:d} {:.3f}s {:.3f}s   \r' \
-                            .format(num_images + 1, len(imglist), detect_time, nms_time))
-            sys.stdout.flush()
+        sys.stdout.write('im_detect: {:d}/{:d} {:.3f}s {:.3f}s   \r' \
+                        .format(num_images + 1, len(imglist), detect_time, nms_time))
+        sys.stdout.flush()
 
-        if vis and webcam_num == -1:
+        if vis:
             result_path = os.path.join(args.image_dir, imglist[num_images][:-4] + "_det.tif")
             cv2.imwrite(result_path, im2show)
-        else:
-            im2showRGB = cv2.cvtColor(im2show, cv2.COLOR_BGR2RGB)
-            cv2.imshow("frame", im2showRGB)
-            total_toc = time.time()
-            total_time = total_toc - total_tic
-            frame_rate = 1 / total_time
-            print('Frame rate:', frame_rate)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
 
     # convert utm to lat long
     for img_name in coords.keys():
@@ -467,7 +431,3 @@ if __name__ == '__main__':
         for img_name in coords:
             for c in coords[img_name]:
                 writer.writerow([img_name] + c[:])
-
-    if webcam_num >= 0:
-        cap.release()
-        cv2.destroyAllWindows()
