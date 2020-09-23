@@ -226,8 +226,8 @@ if __name__ == '__main__':
 
     start = time.time()
     max_per_image = 100
-    thresh = 0.05 # < maybe this
-    vis = True
+    thresh = 0.0 # < maybe this
+    vis = False
 
     # get image directories
     imglist = os.listdir(args.image_dir)
