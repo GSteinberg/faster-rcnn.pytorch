@@ -56,7 +56,7 @@ It will compile all the modules you need, including NMS, ROI_Pooling, ROI_Align 
 
 To generate predictions on your split orthomoasaics, these are the steps you must follow:
 1. Move all the images you want to generate predictions on into `images/`
-2. Download the pretrained model [here](orb.binghamton.edu) **<- make this a real link**
+2. Download the pretrained model [here](https://orb.binghamton.edu/geology_fac/30/)
 3. Move the pretrained model, `faster_rcnn_1_50_10067.pth`, to `models/res101/pascal_voc/`
 4. Run the following command to generate predictions
 ```
