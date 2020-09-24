@@ -195,9 +195,6 @@ if __name__ == '__main__':
 
 
     print('load model successfully!')
-
-    print("load checkpoint %s" % (load_name))
-
     # initilize the tensor holder here.
     im_data = torch.FloatTensor(1)
     im_info = torch.FloatTensor(1)
@@ -299,39 +296,6 @@ if __name__ == '__main__':
             # Simply repeat the boxes, once for each class
             pred_boxes = np.tile(boxes, (1, scores.shape[1]))
 
-        # if cfg.TEST.BBOX_REG:
-        #     # Apply bounding-box regression deltas
-        #     box_deltas = bbox_pred.data
-        #     if cfg.TRAIN.BBOX_NORMALIZE_TARGETS_PRECOMPUTED:
-        #     # Optionally normalize targets by a precomputed mean and stdev
-        #         if args.class_agnostic:
-        #             if args.cuda > 0:
-        #                 box_deltas = box_deltas.view(-1, 4) \
-        #                         * torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS).cuda() \
-        #                         + torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS).cuda()
-        #             else:
-        #                 box_deltas = box_deltas.view(-1, 4) \
-        #                         * torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS) \
-        #                         + torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS)
-
-        #             box_deltas = box_deltas.view(1, -1, 4)
-        #         else:
-        #             if args.cuda > 0:
-        #                 box_deltas = box_deltas.view(-1, 4) \
-        #                         * torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS).cuda() \
-        #                         + torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS).cuda()
-        #             else:
-        #                 box_deltas = box_deltas.view(-1, 4) \
-        #                         * torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS) \
-        #                         + torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS)
-        #             box_deltas = box_deltas.view(1, -1, 4 * len(pascal_classes))
-
-        #     pred_boxes = bbox_transform_inv(boxes, box_deltas, 1)
-        #     pred_boxes = clip_boxes(pred_boxes, im_info.data, 1)
-        # else:
-        #     # Simply repeat the boxes, once for each class
-        #     pred_boxes = np.tile(boxes, (1, scores.shape[1]))
-
         pred_boxes /= im_scales[0]
 
         scores = scores.squeeze()
@@ -360,71 +324,69 @@ if __name__ == '__main__':
                 keep = nms(cls_boxes[order, :], cls_scores[order], cfg.TEST.NMS)
                 cls_dets = cls_dets[keep.view(-1).long()]
             
-                if cls_dets[0][4] >= 0.4:
+                for det in cls_dets:
+                    if det[4] >= 0.4:
+                        # row and col of image in respective orthophoto (img_ortho)
+                        split_img_name = imglist[num_images].split("_Split")
+                        img_row, img_col = int(split_img_name[1][:2]), \
+                                           int(split_img_name[1][2:4])
+                        img_ortho = split_img_name[0]
+                    
+                        # 2 elemt list of pixel of center of landmine
+                        # structure: [average(xmin, xmax), average(ymin, ymax)]
+                        # print('image: {}'.format(img_ortho))
+                        # print('class: {}'.format(pascal_classes[j]))
+                        # print('xmin: {}'.format(cls_dets[0][0]))
+                        # print('xmax: {}'.format(cls_dets[0][2]))
+                        # print('ymin: {}'.format(cls_dets[0][1]))
+                        # print('ymax: {}'.format(cls_dets[0][3]))
+                        # print('score: {}'.format(cls_dets[0][4]))
 
-                    # row and col of image in respective orthophoto (img_ortho)
-                    split_img_name = imglist[num_images].split("_Split")
-                    img_row, img_col = int(split_img_name[1][:2]), \
-                                       int(split_img_name[1][2:4])
-                    img_ortho = split_img_name[0]
-                
-                    # 2 elemt list of pixel of center of landmine
-                    # structure: [average(xmin, xmax), average(ymin, ymax)]
+                        cropped_px = [ int((int(det[0]) + int(det[2])) / 2),
+                                       int((int(det[1]) + int(det[3])) / 2) ]
+                        score = float(det[4])
 
-                    # print()
-                    # print('image: {}'.format(img_ortho))
-                    # print('class: {}'.format(pascal_classes[j]))
-                    # print('xmin: {}'.format(cls_dets[0][0]))
-                    # print('xmax: {}'.format(cls_dets[0][2]))
-                    # print('ymin: {}'.format(cls_dets[0][1]))
-                    # print('ymax: {}'.format(cls_dets[0][3]))
-                    # print('score: {}'.format(cls_dets[0][4]))
-                    # print()
+                        # converting to orthophoto scale
+                        size_minus_stride = args.cropped_img_size - args.cropped_img_stride
+                        ortho_x, ortho_y = cropped_px[0] + (img_col*size_minus_stride), \
+                                           cropped_px[1] + (img_row*size_minus_stride)
 
-                    cropped_px = [ int((int(cls_dets[0][0]) + int(cls_dets[0][2])) / 2),
-                                   int((int(cls_dets[0][1]) + int(cls_dets[0][3])) / 2) ]
+                        # fetch respective ortho metdata
+                        # structure: metadata[0]    == x-pixel res
+                        #            metadata[1:3]  == rotational components
+                        #            metadata[3]    == y-pixel res
+                        #            metadata[4]    == Easting of upper left pixel
+                        #            metadata[5]    == Northing of upper left pixel
+                        img_to_dir = ""
+                        if "Mar16" in img_ortho:
+                            img_to_dir = "Mar16Grass"
+                        elif "Grass" in img_ortho:
+                            img_to_dir = "grassOrth"
+                        elif "Test" in img_ortho:
+                            img_to_dir = "rubbOrth2"
+                        elif "Rubble" in img_ortho:
+                            img_to_dir = "rubbOrth1"
+                        elif "Sand" in img_ortho:
+                            img_to_dir = "May13Sand"
+                        ortho_dir = os.path.join("../../OrthoData/" + img_to_dir + "/images", \
+                                    img_ortho + ".tfw")
+                        f = open(ortho_dir, "r")
+                        metadata = f.read().split("\n")[:-1]
+                        f.close()
 
-                    # converting to orthophoto scale
-                    size_minus_stride = args.cropped_img_size - args.cropped_img_stride
-                    ortho_x, ortho_y = cropped_px[0] + (img_col*size_minus_stride), \
-                                       cropped_px[1] + (img_row*size_minus_stride)
+                        x_res, y_res, easting, northing = \
+                                float(metadata[0]), float(metadata[3]), \
+                                float(metadata[4]), float(metadata[5])
 
-                    # fetch respective ortho metdata
-                    # structure: metadata[0]    == x-pixel res
-                    #            metadata[1:3]  == rotational components
-                    #            metadata[3]    == y-pixel res
-                    #            metadata[4]    == Easting of upper left pixel
-                    #            metadata[5]    == Northing of upper left pixel
-                    img_to_dir = ""
-                    if "Mar16" in img_ortho:
-                        img_to_dir = "Mar16Grass"
-                    elif "Grass" in img_ortho:
-                        img_to_dir = "grassOrth"
-                    elif "Test" in img_ortho:
-                        img_to_dir = "rubbOrth2"
-                    elif "Rubble" in img_ortho:
-                        img_to_dir = "rubbOrth1"
-                    elif "Sand" in img_ortho:
-                        img_to_dir = "May13Sand"
-                    ortho_dir = os.path.join("../../OrthoData/" + img_to_dir + "/images", \
-                                img_ortho + ".tfw")
-                    f = open(ortho_dir, "r")
-                    metadata = f.read().split("\n")[:-1]
-                    f.close()
+                        if img_ortho not in coords.keys():
+                            coords[img_ortho] = []
+                        coords[img_ortho].append([pascal_classes[j], score,
+                                easting + (ortho_x*x_res), northing + (ortho_y*y_res)])
+                        ## ============================================ ##
 
-                    x_res, y_res, easting, northing = \
-                            float(metadata[0]), float(metadata[3]), \
-                            float(metadata[4]), float(metadata[5])
-
-                    if img_ortho not in coords.keys():
-                        coords[img_ortho] = []
-                    coords[img_ortho].append([pascal_classes[j], easting + (ortho_x*x_res), 
-                            northing + (ortho_y*y_res)])
-                    ## ============================================ ##
-
-                    if vis:
-                        im2show = vis_detections(im2show, pascal_classes[j], \
-                                cls_dets.cpu().numpy(), 0.5)
+                        if vis:
+                            im2show = vis_detections(im2show, pascal_classes[j], \
+                                    cls_dets.cpu().numpy(), 0.5)
 
 
         misc_toc = time.time()
@@ -441,22 +403,22 @@ if __name__ == '__main__':
     # convert utm to lat long
     for img_name in coords.keys():
         for pnt in range(len(coords[img_name])):
-            lat_long = utm.to_latlon(coords[img_name][pnt][1], \
-                    coords[img_name][pnt][2], 18, 'T')
+            lat_long = utm.to_latlon(coords[img_name][pnt][2], \
+                    coords[img_name][pnt][3], 18, 'T')
             coords[img_name][pnt].extend(lat_long)
 
     # coords for each ortho
     for img_name in coords.keys():
         with open("output/csvs/" + img_name + '_coords.csv', 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(["Object", "Easting", "Northing", "Latitude", "Longitude"])
+            writer.writerow(["Object", "Score", "Easting", "Northing", "Latitude", "Longitude"])
             for c in coords[img_name]:
                 writer.writerow(c[:])
         
     # All coords from all orthos
     with open('output/csvs/all_coords.csv', 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow(["Photo", "Object", "Easting", "Northing", "Latitude", "Longitude"])
+        writer.writerow(["Photo", "Object", "Score", "Easting", "Northing", "Latitude", "Longitude"])
         for img_name in coords:
             for c in coords[img_name]:
                 writer.writerow([img_name] + c[:])
