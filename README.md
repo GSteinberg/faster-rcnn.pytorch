@@ -18,12 +18,12 @@ cd faster-rcnn.pytorch && mkdir images
 
 and the folder where you will put your pretrained model:
 ```
-cd faster-rcnn.pytorch && mkdir models && mkdir resnet101 && mkdir pascal_voc
+cd faster-rcnn.pytorch && mkdir -p models/resnet101/pascal_voc
 ```
 
 and lastly, the folder where your generated predictions will be outputted:
 ```
-cd faster-rcnn.pytorch && mkdir output && mkdir csvs
+cd faster-rcnn.pytorch && mkdir -p output/csvs
 ```
 
 ### Prerequisites
