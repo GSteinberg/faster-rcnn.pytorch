@@ -34,11 +34,15 @@ First, make sure your environment is set up with these three main prerequisites.
 
 * Python 2.7 or 3.6
 * Pytorch 1.0 or higher
-* CUDA 8.0 or higher
+* CUDA 8.0 or higher (optional)
 
 Then, install all the python dependencies using pip:
 ```
 pip install -r requirements.txt
+```
+or using conda (the below command will install the cpu-only version of pytorch and will not include any CUDA related packages. If you plan to run this with CUDA, you must install the CUDA compatible version of PyTorch and any CUDA packages on your own):
+```
+`conda create --name <env> --file conda_requirements.txt`
 ```
 
 Compile the cuda dependencies using following simple commands:
@@ -64,6 +68,7 @@ python demo.py --net res101 --checksession 1 --checkepoch 50 \
                --checkpoint 10067 --cuda --load_dir models/ \
                --crop_size 700 --crop_stride 70
 ```
+Note: if you are running a cpu-only version of PyTorch, exclude the `--cuda` flag from the above command.
 
 You will find the generated coordinate predictions in `faster-rcnn.pytorch/output/csvs/`.
 
