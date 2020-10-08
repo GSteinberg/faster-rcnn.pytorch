@@ -279,16 +279,28 @@ if __name__ == '__main__':
             box_deltas = bbox_pred.data
             if cfg.TRAIN.BBOX_NORMALIZE_TARGETS_PRECOMPUTED:
                 # Optionally normalize targets by a precomputed mean and stdev
-                if args.class_agnostic:
-                    box_deltas = box_deltas.view(-1, 4) \
-                                * torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS).cuda() \
-                                + torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS).cuda()
-                    box_deltas = box_deltas.view(1, -1, 4)
+                if args.cuda > 0:
+                    if args.class_agnostic:
+                        box_deltas = box_deltas.view(-1, 4) \
+                                    * torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS).cuda() \
+                                    + torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS).cuda()
+                        box_deltas = box_deltas.view(1, -1, 4)
+                    else:
+                        box_deltas = box_deltas.view(-1, 4) \
+                                    * torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS).cuda() \
+                                    + torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS).cuda()
+                        box_deltas = box_deltas.view(1, -1, 4 * len(pascal_classes))
                 else:
-                    box_deltas = box_deltas.view(-1, 4) \
-                                * torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS).cuda() \
-                                + torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS).cuda()
-                    box_deltas = box_deltas.view(1, -1, 4 * len(pascal_classes))
+                    if args.class_agnostic:
+                        box_deltas = box_deltas.view(-1, 4) \
+                                    * torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS) \
+                                    + torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS)
+                        box_deltas = box_deltas.view(1, -1, 4)
+                    else:
+                        box_deltas = box_deltas.view(-1, 4) \
+                                    * torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS) \
+                                    + torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS)
+                        box_deltas = box_deltas.view(1, -1, 4 * len(pascal_classes))
 
             pred_boxes = bbox_transform_inv(boxes, box_deltas, 1)
             pred_boxes = clip_boxes(pred_boxes, im_info.data, 1)
@@ -357,18 +369,7 @@ if __name__ == '__main__':
                         #            metadata[3]    == y-pixel res
                         #            metadata[4]    == Easting of upper left pixel
                         #            metadata[5]    == Northing of upper left pixel
-                        img_to_dir = ""
-                        if "Mar16" in img_ortho:
-                            img_to_dir = "Mar16Grass"
-                        elif "Grass" in img_ortho:
-                            img_to_dir = "grassOrth"
-                        elif "Test" in img_ortho:
-                            img_to_dir = "rubbOrth2"
-                        elif "Rubble" in img_ortho:
-                            img_to_dir = "rubbOrth1"
-                        elif "Sand" in img_ortho:
-                            img_to_dir = "May13Sand"
-                        ortho_dir = os.path.join("../../OrthoData/" + img_to_dir + "/images", \
+                        ortho_dir = os.path.join("../OrthoData/metadata", \
                                     img_ortho + ".tfw")
                         f = open(ortho_dir, "r")
                         metadata = f.read().split("\n")[:-1]
