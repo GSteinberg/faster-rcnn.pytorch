@@ -42,7 +42,7 @@ pip install -r requirements.txt
 ```
 or using conda (the below command will install the cpu-only version of pytorch and will not include any CUDA related packages. If you plan to run this with CUDA, you must install the CUDA compatible version of PyTorch and any CUDA packages on your own):
 ```
-`conda create --name <env> --file conda_requirements.txt`
+conda create --name <env> --file conda_requirements.txt
 ```
 
 Compile the cuda dependencies using following simple commands:
